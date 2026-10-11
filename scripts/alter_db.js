@@ -30,27 +30,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS "Message_clientMessageId_key" ON "Message"("cl
 `;
 
 async function run() {
-  const connectionStrings = [
-    'postgresql://oneai_app:AppPassword123!@ep-withered-hat-ahhoyqot.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require',
-    'postgresql://neondb_owner:npg_RrHoFq2wKSP3@ep-withered-hat-ahhoyqot.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require'
-  ];
-
-  for (const conn of connectionStrings) {
-    const user = conn.includes('neondb_owner') ? 'neondb_owner' : 'oneai_app';
-    console.log(`Trying to run migrations as user: ${user}...`);
-    const client = new Client({ connectionString: conn });
-    try {
-      await client.connect();
-      await client.query(sql);
-      console.log(`✅ Migrations completed successfully as ${user}!`);
-      await client.end();
-      return;
-    } catch (err) {
-      console.error(`Failed to migrate as ${user}:`, err.message);
-      try { await client.end(); } catch {}
-    }
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required');
   }
-  process.exit(1);
+
+  console.log('Running migrations...');
+  const client = new Client({ connectionString, ssl: { rejectUnauthorized: false } });
+  try {
+    await client.connect();
+    await client.query(sql);
+    console.log('✅ Migrations completed successfully!');
+  } catch (err) {
+    console.error('Migration failed:', err);
+  } finally {
+    await client.end();
+  }
 }
 
 run();

@@ -1,8 +1,12 @@
 import { Client } from 'pg';
 
 async function run() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required');
+  }
   const client = new Client({
-    connectionString: "postgresql://neondb_owner:npg_RrHoFq2wKSP3@ep-withered-hat-ahhoyqot.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require",
+    connectionString,
     ssl: { rejectUnauthorized: false }
   });
   await client.connect();

@@ -118,6 +118,8 @@ export async function logTokenUsage(
       cost = (inputTokens * 3.0 + outputTokens * 15.0) / 1000000;
     } else if (modelUpper.includes('GEMINI')) {
       cost = (inputTokens * 0.075 + outputTokens * 0.30) / 1000000;
+    } else if (modelUpper.includes('QWEN') || modelUpper.includes('LLAMA') || modelUpper.includes('ONEAI') || modelUpper.includes('LOCAL') || modelUpper.includes('OLLAMA')) {
+      cost = 0; // Self-hosted local inference has zero per-token cost
     } else {
       // Default to GPT-4-turbo
       cost = (inputTokens * 10.0 + outputTokens * 30.0) / 1000000;
@@ -155,10 +157,10 @@ export async function getTenantAIClient(tenantId: string, bypassTrialCheck: bool
     where: { tenantId },
   });
 
-  const provider = config?.provider || 'OPENAI';
+  const provider = config?.provider || (process.env.OPENAI_BASE_URL ? 'LOCAL' : 'OPENAI');
   let apiKey = '';
 
-  if (config?.isActive && config.encryptedApiKey) {
+  if (config?.isActive && config.encryptedApiKey && config.provider !== 'LOCAL') {
     try {
       apiKey = decrypt(config.encryptedApiKey);
     } catch {
@@ -166,8 +168,10 @@ export async function getTenantAIClient(tenantId: string, bypassTrialCheck: bool
     }
   }
 
-  // Fallback to platform keys if no tenant key is configured
-  if (!apiKey) {
+  // Fallback to platform keys or self-hosted local model
+  if (provider === 'LOCAL') {
+    apiKey = 'ollama';
+  } else if (!apiKey) {
     // Enforce trial usage limit unless explicitly bypassed
     if (!bypassTrialCheck) {
       const exceeded = await isTrialExceeded(tenantId);
@@ -177,7 +181,7 @@ export async function getTenantAIClient(tenantId: string, bypassTrialCheck: bool
     }
 
     if (provider === 'OPENAI') {
-      apiKey = process.env.OPENAI_API_KEY || '';
+      apiKey = process.env.OPENAI_API_KEY || (process.env.OPENAI_BASE_URL ? 'local-ollama' : '');
     } else if (provider === 'GEMINI') {
       apiKey = process.env.GEMINI_API_KEY || '';
     } else {
@@ -185,7 +189,7 @@ export async function getTenantAIClient(tenantId: string, bypassTrialCheck: bool
     }
   }
 
-  const isMock = apiKey.startsWith('sk-mock') || !apiKey;
+  const isMock = !process.env.OPENAI_BASE_URL && provider !== 'LOCAL' && (apiKey.startsWith('sk-mock') || !apiKey);
 
   return {
     generateChat: async (arg1: any, arg2?: any): Promise<string> => {
@@ -222,30 +226,34 @@ export async function getTenantAIClient(tenantId: string, bypassTrialCheck: bool
         return responseText;
       }
 
-      // Real API triggers
-      if (provider === 'OPENAI') {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Real API triggers (Local LLM or OpenAI compatible)
+      if (provider === 'LOCAL' || provider === 'OPENAI') {
+        const isLocal = provider === 'LOCAL' || !!process.env.OPENAI_BASE_URL;
+        const baseUrl = isLocal ? (process.env.OPENAI_BASE_URL || 'http://ollama:11434/v1') : 'https://api.openai.com/v1';
+        const modelName = isLocal ? (process.env.OPENAI_MODEL || 'oneai-qwen') : 'gpt-4-turbo';
+
+        const response = await fetch(`${baseUrl}/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: 'gpt-4-turbo',
+            model: modelName,
             messages,
             temperature: 0.7,
           }),
         });
 
         if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error?.message || 'OpenAI API call failed');
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error?.message || `AI API call failed with status ${response.status}`);
         }
 
         const data = await response.json();
         const inputTokens = data.usage?.prompt_tokens || 0;
         const outputTokens = data.usage?.completion_tokens || 0;
-        await logTokenUsage(tenantId, inputTokens, outputTokens, 'gpt-4-turbo');
+        await logTokenUsage(tenantId, inputTokens, outputTokens, modelName);
         
         return data.choices[0]?.message?.content || '';
       } else if (provider === 'GEMINI') {

@@ -45,7 +45,13 @@ const handle = nextApp.getRequestHandler();
 nextApp.prepare().then(() => {
   const app = express();
   app.use(cors());
-  app.use(express.json());
+
+  // Scope express.json() only to Express endpoints so Next.js App Router request body streams remain undisturbed
+  const expressJson = express.json();
+  app.use('/api/whatsapp', expressJson);
+  app.use('/api/webhook/meta', expressJson);
+  app.use('/api/webhooks/imessage', expressJson);
+  app.use('/api/webhooks/instagram', expressJson);
 
   const server = http.createServer(app);
 

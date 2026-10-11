@@ -3,7 +3,7 @@ import { Client } from 'pg';
 
 async function rollback() {
   console.log('Rolling back Phase 1 migration changes...');
-  const connStr = 'postgresql://neondb_owner:npg_RrHoFq2wKSP3@ep-withered-hat-ahhoyqot.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require';
+  const connStr = process.env.DATABASE_URL; if (!connStr) throw new Error('DATABASE_URL required');
   const client = new Client({ connectionString: connStr, ssl: { rejectUnauthorized: false } });
   await client.connect();
 

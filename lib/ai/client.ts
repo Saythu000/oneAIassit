@@ -157,10 +157,10 @@ export async function getTenantAIClient(tenantId: string, bypassTrialCheck: bool
     where: { tenantId },
   });
 
-  const provider = config?.provider || 'OPENAI';
+  const provider = config?.provider || (process.env.OPENAI_BASE_URL ? 'LOCAL' : 'OPENAI');
   let apiKey = '';
 
-  if (config?.isActive && config.encryptedApiKey) {
+  if (config?.isActive && config.encryptedApiKey && config.provider !== 'LOCAL') {
     try {
       apiKey = decrypt(config.encryptedApiKey);
     } catch {
@@ -168,8 +168,10 @@ export async function getTenantAIClient(tenantId: string, bypassTrialCheck: bool
     }
   }
 
-  // Fallback to platform keys if no tenant key is configured
-  if (!apiKey) {
+  // Fallback to platform keys or self-hosted local model
+  if (provider === 'LOCAL') {
+    apiKey = 'ollama';
+  } else if (!apiKey) {
     // Enforce trial usage limit unless explicitly bypassed
     if (!bypassTrialCheck) {
       const exceeded = await isTrialExceeded(tenantId);
@@ -187,7 +189,7 @@ export async function getTenantAIClient(tenantId: string, bypassTrialCheck: bool
     }
   }
 
-  const isMock = !process.env.OPENAI_BASE_URL && (apiKey.startsWith('sk-mock') || !apiKey);
+  const isMock = !process.env.OPENAI_BASE_URL && provider !== 'LOCAL' && (apiKey.startsWith('sk-mock') || !apiKey);
 
   return {
     generateChat: async (arg1: any, arg2?: any): Promise<string> => {
@@ -224,10 +226,11 @@ export async function getTenantAIClient(tenantId: string, bypassTrialCheck: bool
         return responseText;
       }
 
-      // Real API triggers
-      if (provider === 'OPENAI') {
-        const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-        const modelName = process.env.OPENAI_MODEL || 'gpt-4-turbo';
+      // Real API triggers (Local LLM or OpenAI compatible)
+      if (provider === 'LOCAL' || provider === 'OPENAI') {
+        const isLocal = provider === 'LOCAL' || !!process.env.OPENAI_BASE_URL;
+        const baseUrl = isLocal ? (process.env.OPENAI_BASE_URL || 'http://ollama:11434/v1') : 'https://api.openai.com/v1';
+        const modelName = isLocal ? (process.env.OPENAI_MODEL || 'oneai-qwen') : 'gpt-4-turbo';
 
         const response = await fetch(`${baseUrl}/chat/completions`, {
           method: 'POST',

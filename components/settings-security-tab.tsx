@@ -10,13 +10,17 @@ import {
   AlertTriangle, 
   Sparkles, 
   RefreshCw, 
-  Copy,
-  Check,
-  Cpu
+  Copy, 
+  Check, 
+  Cpu,
+  Server
 } from 'lucide-react';
 
 interface KeyConfigData {
-  activeProvider: 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
+  activeProvider: 'LOCAL' | 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
+  localConfigured?: boolean;
+  localEndpoint?: string;
+  localModelName?: string;
   geminiKeyConfigured: boolean;
   geminiKeyMasked: string;
   openaiKeyConfigured: boolean;
@@ -31,7 +35,7 @@ interface KeyConfigData {
 export default function SettingsSecurityTab() {
   const queryClient = useQueryClient();
 
-  const [selectedProvider, setSelectedProvider] = useState<'GEMINI' | 'OPENAI' | 'ANTHROPIC'>('GEMINI');
+  const [selectedProvider, setSelectedProvider] = useState<'LOCAL' | 'GEMINI' | 'OPENAI' | 'ANTHROPIC'>('LOCAL');
   const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>({
     GEMINI: '',
     OPENAI: '',
@@ -77,7 +81,7 @@ export default function SettingsSecurityTab() {
   });
 
   // 1-Click Test Connection Handler for any provider
-  const handleTestConnection = async (prov: 'GEMINI' | 'OPENAI' | 'ANTHROPIC') => {
+  const handleTestConnection = async (prov: 'LOCAL' | 'GEMINI' | 'OPENAI' | 'ANTHROPIC') => {
     setIsTesting(true);
     setTestResult(null);
     try {
@@ -87,7 +91,7 @@ export default function SettingsSecurityTab() {
         body: JSON.stringify({
           action: 'TEST_CONNECTION',
           provider: prov,
-          apiKey: apiKeyInputs[prov] || undefined,
+          apiKey: prov !== 'LOCAL' ? (apiKeyInputs[prov] || undefined) : undefined,
         }),
       });
       const data = await res.json();
@@ -109,32 +113,42 @@ export default function SettingsSecurityTab() {
     setTimeout(() => setCopiedSecret(false), 2000);
   };
 
-  const currentActive = keyData?.activeProvider || 'GEMINI';
+  const currentActive = keyData?.activeProvider || 'LOCAL';
 
   const providers = [
+    {
+      id: 'LOCAL' as const,
+      name: 'Self-Hosted Local LLM (Ollama)',
+      model: keyData?.localModelName || 'oneai-qwen (Qwen 2.5 1.5B)',
+      isLocal: true,
+      desc: 'Hosted on your Hetzner VPS in Docker. Unlimited agent messages, zero per-token cost ($0.00 API bills), and 100% private data.',
+    },
     {
       id: 'GEMINI' as const,
       name: 'Google Gemini',
       model: 'gemini-2.5-flash',
+      isLocal: false,
       placeholder: keyData?.geminiKeyMasked || 'Enter Gemini API Key (AIzaSy...)',
       isConfigured: keyData?.geminiKeyConfigured ?? true,
-      desc: 'High speed, recommended for vector embeddings and policy RAG retrieval.',
+      desc: 'Cloud API with per-token billing. High speed, recommended for vector embeddings and policy RAG retrieval.',
     },
     {
       id: 'OPENAI' as const,
-      name: 'OpenAI',
+      name: 'OpenAI Cloud',
       model: 'gpt-4-turbo',
+      isLocal: false,
       placeholder: keyData?.openaiKeyMasked || 'Enter OpenAI API Key (sk-proj-...)',
       isConfigured: keyData?.openaiKeyConfigured ?? true,
-      desc: 'Industry standard for multi-choice customer intake and function calling.',
+      desc: 'Cloud API with per-token billing. Standard for complex reasoning & customer intake.',
     },
     {
       id: 'ANTHROPIC' as const,
       name: 'Anthropic Claude',
       model: 'claude-3-5-sonnet',
+      isLocal: false,
       placeholder: keyData?.anthropicKeyMasked || 'Enter Anthropic API Key (sk-ant-...)',
       isConfigured: keyData?.anthropicKeyConfigured ?? true,
-      desc: 'Advanced reasoning engine for complex insurance policy negotiations.',
+      desc: 'Cloud API with per-token billing. Advanced reasoning engine for complex insurance policy negotiations.',
     },
   ];
 
@@ -146,19 +160,19 @@ export default function SettingsSecurityTab() {
           <div>
             <h3 className="text-base font-bold text-[#1B4B91] flex items-center gap-2">
               <Cpu className="w-5 h-5 text-[#004ac6]" />
-              AI Copilot & Multi-LLM Provider Credentials
+              AI Copilot & Multi-LLM Engine Configuration
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Manage encrypted API keys for all 3 supported AI model providers (Google Gemini, OpenAI, Anthropic Claude).
+              Select your active agent engine. Choose between your <strong>Zero-Cost Self-Hosted Local Model</strong> or Cloud APIs (Gemini, OpenAI, Claude).
             </p>
           </div>
           <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full flex items-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            ACTIVE: {currentActive}
+            ACTIVE: {currentActive === 'LOCAL' ? 'SELF-HOSTED LOCAL (QWEN)' : currentActive}
           </span>
         </div>
 
-        {/* 3 Provider Key Manager Cards */}
+        {/* 4 Provider Key Manager Cards */}
         <div className="space-y-4">
           {providers.map((prov) => {
             const isSelectedActive = currentActive === prov.id;
@@ -175,11 +189,17 @@ export default function SettingsSecurityTab() {
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
-                    <Sparkles className={`w-4 h-4 ${isSelectedActive ? 'text-[#004ac6]' : 'text-gray-400'}`} />
+                    {prov.isLocal ? (
+                      <Server className={`w-4 h-4 ${isSelectedActive ? 'text-emerald-600' : 'text-gray-400'}`} />
+                    ) : (
+                      <Sparkles className={`w-4 h-4 ${isSelectedActive ? 'text-[#004ac6]' : 'text-gray-400'}`} />
+                    )}
                     <h4 className="text-xs font-bold text-[#1c1b1f]">{prov.name} ({prov.model})</h4>
                     {isSelectedActive && (
-                      <span className="text-[10px] font-extrabold text-[#004ac6] bg-blue-100 px-2 py-0.5 rounded-full">
-                        ACTIVE ENGINE
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                        prov.isLocal ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-[#004ac6]'
+                      }`}>
+                        {prov.isLocal ? 'ACTIVE ENGINE • $0.00 BILLING' : 'ACTIVE ENGINE'}
                       </span>
                     )}
                   </div>
@@ -198,40 +218,79 @@ export default function SettingsSecurityTab() {
 
                 <p className="text-[11px] text-gray-500 mb-3">{prov.desc}</p>
 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="password"
-                    placeholder={prov.placeholder}
-                    value={inputValue}
-                    onChange={(e) =>
-                      setApiKeyInputs((prev) => ({ ...prev, [prov.id]: e.target.value }))
-                    }
-                    className="flex-1 px-3.5 py-2 bg-white border border-gray-300 rounded-xl text-xs outline-none focus:border-[#004ac6] focus:ring-1 focus:ring-[#004ac6] transition"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleTestConnection(prov.id)}
-                      disabled={isTesting}
-                      className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
-                      Test Key
-                    </button>
+                {prov.isLocal ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white border border-emerald-200 rounded-xl">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="font-mono text-xs font-bold text-emerald-950">
+                          {keyData?.localEndpoint || 'http://ollama:11434/v1'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-700">
+                        Isolated Docker Network • No External API Key Required • Zero Token Charges
+                      </p>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        inputValue && saveKeyMutation.mutate({ provider: prov.id, keyToSave: inputValue })
-                      }
-                      disabled={!inputValue || saveKeyMutation.isPending}
-                      className="px-4 py-2 bg-[#004ac6] hover:bg-[#003da3] text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-40 transition flex items-center gap-1.5"
-                    >
-                      <Lock className="w-3.5 h-3.5" />
-                      Save Key
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTestConnection('LOCAL')}
+                        disabled={isTesting}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
+                        Test Connection
+                      </button>
+
+                      {!isSelectedActive && (
+                        <button
+                          type="button"
+                          onClick={() => saveKeyMutation.mutate({ provider: 'LOCAL' })}
+                          disabled={saveKeyMutation.isPending}
+                          className="px-3.5 py-1.5 bg-[#004ac6] hover:bg-[#003da3] text-white text-xs font-bold rounded-xl transition shadow-sm"
+                        >
+                          Activate Local Model
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="password"
+                      placeholder={prov.placeholder}
+                      value={inputValue}
+                      onChange={(e) =>
+                        setApiKeyInputs((prev) => ({ ...prev, [prov.id]: e.target.value }))
+                      }
+                      className="flex-1 px-3.5 py-2 bg-white border border-gray-300 rounded-xl text-xs outline-none focus:border-[#004ac6] focus:ring-1 focus:ring-[#004ac6] transition"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTestConnection(prov.id as any)}
+                        disabled={isTesting}
+                        className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
+                        Test Key
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          inputValue && saveKeyMutation.mutate({ provider: prov.id, keyToSave: inputValue })
+                        }
+                        disabled={!inputValue || saveKeyMutation.isPending}
+                        className="px-4 py-2 bg-[#004ac6] hover:bg-[#003da3] text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-40 transition flex items-center gap-1.5"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        Save Key
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -252,44 +311,43 @@ export default function SettingsSecurityTab() {
         </div>
       </div>
 
-      {/* Webhook Signing Secrets Card */}
-      <div className="bg-white border border-[#c3c6d7] rounded-2xl p-6 shadow-sm space-y-4">
-        <h4 className="text-sm font-bold text-[#1B4B91] flex items-center gap-2">
-          <Key className="w-4 h-4 text-[#004ac6]" />
-          Webhook HMAC Signature & Signing Secrets
-        </h4>
-        <p className="text-xs text-gray-500">
-          Use this HMAC secret key to verify incoming webhook payloads from Meta WhatsApp Cloud API and external marketing automation apps.
-        </p>
-
-        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-          <span className="font-mono text-xs text-slate-800 font-bold">whsec_9a8b7c6d5e4f3210987654321</span>
-          <button
-            type="button"
-            onClick={copySecret}
-            className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-lg shadow-sm transition"
-          >
-            {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-            {copiedSecret ? 'Copied!' : 'Copy Secret'}
-          </button>
-        </div>
-      </div>
-
-      {/* Database RLS Security Card */}
-      <div className="bg-white border border-[#c3c6d7] rounded-2xl p-6 shadow-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-purple-50 text-purple-700 rounded-xl border border-purple-200">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
+      {/* Webhook & Security Configuration Card */}
+      <div className="bg-white border border-[#c3c6d7] rounded-2xl p-6 shadow-sm space-y-6">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
           <div>
-            <h4 className="text-xs font-bold text-[#1c1b1f]">PostgreSQL Row-Level Security (RLS) Status</h4>
-            <p className="text-[11px] text-gray-500">All tenant database records isolated via `set_config('app.current_tenant_id')`</p>
+            <h3 className="text-base font-bold text-[#1B4B91] flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-[#004ac6]" />
+              Inbound Webhook Verification & Tenant Isolation
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Cryptographic HMAC secret used to verify incoming webhook payloads and PostgreSQL Row-Level Security.
+            </p>
           </div>
+          <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full flex items-center gap-1.5">
+            <Lock className="w-3.5 h-3.5" />
+            RLS STRICT
+          </span>
         </div>
 
-        <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-extrabold rounded-full">
-          RLS ENFORCED
-        </span>
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-700">Webhook HMAC Secret (SHA-256)</span>
+            <button
+              type="button"
+              onClick={copySecret}
+              className="text-xs text-[#004ac6] hover:text-[#003da3] font-bold flex items-center gap-1"
+            >
+              {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedSecret ? 'Copied!' : 'Copy Secret'}
+            </button>
+          </div>
+          <div className="font-mono text-xs bg-white px-3 py-2 border border-gray-200 rounded-lg text-gray-600">
+            {keyData?.webhookSecretMasked || 'whsec_••••••••••••94f2'}
+          </div>
+          <p className="text-[11px] text-gray-500">
+            Include this secret in your Meta WhatsApp and Webhook signatures to ensure authentic origin verification.
+          </p>
+        </div>
       </div>
     </div>
   );

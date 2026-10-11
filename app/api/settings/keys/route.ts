@@ -16,17 +16,28 @@ export async function GET() {
       where: { tenantId: targetTenant },
     });
 
-    const activeProvider = config?.provider || 'GEMINI';
+    const activeProvider = config?.provider || (process.env.OPENAI_BASE_URL ? 'LOCAL' : 'GEMINI');
+
+    const modelName = activeProvider === 'LOCAL'
+      ? (process.env.OPENAI_MODEL ? `${process.env.OPENAI_MODEL} (Self-Hosted Local)` : 'oneai-qwen (Self-Hosted Qwen 2.5 1.5B)')
+      : activeProvider === 'GEMINI'
+      ? 'gemini-2.5-flash'
+      : activeProvider === 'OPENAI'
+      ? 'gpt-4-turbo'
+      : 'claude-3-5-sonnet';
 
     return NextResponse.json({
       activeProvider,
+      localConfigured: true,
+      localEndpoint: process.env.OPENAI_BASE_URL || 'http://ollama:11434/v1',
+      localModelName: process.env.OPENAI_MODEL || 'oneai-qwen',
       geminiKeyConfigured: !!config?.encryptedApiKey,
       geminiKeyMasked: config?.encryptedApiKey ? '••••••••••••' + config.encryptedApiKey.slice(-4) : '',
       openaiKeyConfigured: true,
       openaiKeyMasked: 'sk-proj-••••••••••••81a2',
       anthropicKeyConfigured: true,
       anthropicKeyMasked: 'sk-ant-••••••••••••94b7',
-      modelName: activeProvider === 'GEMINI' ? 'gemini-2.5-flash' : activeProvider === 'OPENAI' ? 'gpt-4-turbo' : 'claude-3-5-sonnet',
+      modelName,
       webhookSecretConfigured: true,
       webhookSecretMasked: 'whsec_••••••••••••94f2',
       rlsEnforced: true,
@@ -47,11 +58,52 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { action, apiKey, provider = 'GEMINI' } = body;
+    const { action, apiKey, provider = 'LOCAL' } = body;
 
     // Test API Key connection action
     if (action === 'TEST_CONNECTION') {
-      const providerName = provider === 'OPENAI' ? 'OpenAI GPT-4-turbo' : provider === 'ANTHROPIC' ? 'Anthropic Claude 3.5 Sonnet' : 'Google Gemini 2.5 Flash';
+      if (provider === 'LOCAL') {
+        const baseUrl = process.env.OPENAI_BASE_URL || 'http://ollama:11434/v1';
+        const modelName = process.env.OPENAI_MODEL || 'oneai-qwen';
+
+        try {
+          const startTime = Date.now();
+          const response = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer ollama',
+            },
+            body: JSON.stringify({
+              model: modelName,
+              messages: [{ role: 'user', content: 'Say OK' }],
+              max_tokens: 5,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Local model responded with status ${response.status}`);
+          }
+
+          const latency = Date.now() - startTime;
+          return NextResponse.json({
+            success: true,
+            message: `Connection Successful! Self-hosted Local LLM (${modelName}) is active & responding (${latency}ms latency, $0.00 token cost).`,
+            responseSnippet: 'OK',
+          });
+        } catch (err: any) {
+          return NextResponse.json({
+            success: false,
+            error: `Failed to connect to local LLM at ${baseUrl}: ${err.message}`,
+          }, { status: 502 });
+        }
+      }
+
+      const providerName = provider === 'OPENAI'
+        ? 'OpenAI GPT-4-turbo'
+        : provider === 'ANTHROPIC'
+        ? 'Anthropic Claude 3.5 Sonnet'
+        : 'Google Gemini 2.5 Flash';
 
       return NextResponse.json({
         success: true,
@@ -62,8 +114,14 @@ export async function POST(req: Request) {
 
     // Save API Key action
     if (apiKey || provider) {
-      const encryptedKey = apiKey ? encrypt(apiKey) : 'default_encrypted_key';
-      const aiProviderEnum = provider === 'OPENAI' ? 'OPENAI' : provider === 'ANTHROPIC' ? 'ANTHROPIC' : 'GEMINI';
+      const encryptedKey = apiKey ? encrypt(apiKey) : encrypt('self-hosted-local-ollama');
+      const aiProviderEnum = (provider === 'LOCAL')
+        ? 'LOCAL'
+        : (provider === 'OPENAI')
+        ? 'OPENAI'
+        : (provider === 'ANTHROPIC')
+        ? 'ANTHROPIC'
+        : 'GEMINI';
 
       const targetRole = role || 'ADMIN';
       const db = getTenantPrisma(targetTenant, targetRole);
@@ -72,13 +130,13 @@ export async function POST(req: Request) {
         where: { tenantId: targetTenant },
         update: {
           ...(apiKey && { encryptedApiKey: encryptedKey }),
-          provider: aiProviderEnum,
+          provider: aiProviderEnum as any,
           isActive: true,
         },
         create: {
           tenantId: targetTenant,
           encryptedApiKey: encryptedKey,
-          provider: aiProviderEnum,
+          provider: aiProviderEnum as any,
           isActive: true,
         },
       });
@@ -94,7 +152,10 @@ export async function POST(req: Request) {
         }).catch(() => {});
       }
 
-      return NextResponse.json({ success: true, message: `API key and active provider (${aiProviderEnum}) saved successfully` });
+      return NextResponse.json({
+        success: true,
+        message: `Active AI provider set to ${aiProviderEnum === 'LOCAL' ? 'Self-Hosted Local LLM (oneai-qwen)' : aiProviderEnum}. All agents now route to this engine.`,
+      });
     }
 
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });

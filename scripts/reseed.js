@@ -1,6 +1,6 @@
 const { Client } = require('pg');
 const { execSync } = require('child_process');
-require('dotenv').config({ path: 'D:/codebase/oneaiassist_v1/.env' });
+require('dotenv').config();
 
 const tables = [
   'User',
@@ -26,7 +26,10 @@ const tables = [
 ];
 
 async function run() {
-  const connectionString = "postgresql://neondb_owner:npg_RrHoFq2wKSP3@ep-withered-hat-ahhoyqot.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require";
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required');
+  }
 
   const client = new Client({
     connectionString,

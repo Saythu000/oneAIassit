@@ -13,6 +13,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# Build-time placeholder environment variables so Next.js build-time data collection passes
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder?sslmode=disable"
+ENV NEXTAUTH_SECRET="build_placeholder_secret_32bytes_long!"
+ENV ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
 # Copy package manifests and Prisma schema first
 COPY package*.json ./
 COPY prisma ./prisma/

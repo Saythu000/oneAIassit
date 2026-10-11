@@ -9,17 +9,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Production environment variables
-ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Copy package manifests and Prisma schema first for optimal Docker layer caching
+# Copy package manifests and Prisma schema first
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies (including tsx for the unified server runtime)
+# Install all dependencies needed for building (including devDependencies like tailwindcss & typescript)
 RUN npm install --legacy-peer-deps
 
 # Ensure whatsapp-rust-bridge exports resolve properly under modern Node ESM/CJS loader
@@ -45,6 +43,9 @@ COPY . .
 
 # Build Next.js production bundle
 RUN npm run build
+
+# Set production runtime environment
+ENV NODE_ENV=production
 
 # Expose HTTP & Socket.IO unified port
 EXPOSE 3000

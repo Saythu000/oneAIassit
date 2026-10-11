@@ -23,7 +23,42 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
-    // 2. Call WhatsApp send helper (handles RLS and forward to engine)
+    // 2. Multi-Channel dispatch: Check if conversation is EMAIL
+    if (conversation.channel === 'EMAIL') {
+      const customer = await db.customer.findUnique({
+        where: { id: conversation.customerId },
+      });
+
+      if (!customer?.email) {
+        return NextResponse.json({ error: 'Customer email address not found' }, { status: 400 });
+      }
+
+      const { EmailTransportAdapter } = await import('@/lib/email/EmailTransportAdapter');
+      const emailTransport = new EmailTransportAdapter(tenantId);
+      await emailTransport.sendText(customer.email, text);
+
+      const message = await db.message.create({
+        data: {
+          tenantId,
+          conversationId: conversation.id,
+          direction: 'OUTBOUND',
+          senderType: 'AGENT',
+          channel: 'EMAIL',
+          messageType: 'TEXT',
+          content: text,
+          status: 'SENT',
+        },
+      });
+
+      await db.conversation.update({
+        where: { id: conversation.id },
+        data: { lastMessageAt: new Date() },
+      });
+
+      return NextResponse.json({ success: true, messageId: message.id });
+    }
+
+    // 3. WhatsApp dispatch (default)
     const result = await sendWhatsAppMessage({
       tenantId,
       customerId: conversation.customerId,

@@ -12,8 +12,13 @@ export async function GET(req: Request) {
     const status = searchParams.get('status');
     const search = searchParams.get('search');
 
+    const channel = searchParams.get('channel');
+
     const where: any = { tenantId };
 
+    if (channel && channel !== 'ALL') {
+      where.channel = channel;
+    }
     if (category && category !== 'ALL') {
       where.category = category;
     }
@@ -24,6 +29,7 @@ export async function GET(req: Request) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { body: { contains: search, mode: 'insensitive' } },
+        { subject: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -34,7 +40,13 @@ export async function GET(req: Request) {
         tenantId: true,
         name: true,
         category: true,
+        channel: true,
         language: true,
+        subject: true,
+        previewText: true,
+        htmlBody: true,
+        plainText: true,
+        jsonDesign: true,
         body: true,
         content: true,
         header: true,
@@ -61,9 +73,15 @@ export async function POST(req: Request) {
     const bodyData = await req.json();
     const {
       name,
+      channel = 'WHATSAPP',
       category = 'MARKETING',
       language = 'en',
-      body,
+      body = '',
+      subject,
+      previewText,
+      htmlBody,
+      plainText,
+      jsonDesign,
       headerType = 'NONE',
       header,
       footer,
@@ -71,9 +89,16 @@ export async function POST(req: Request) {
       autoSubmit = false,
     } = bodyData;
 
-    if (!name || !body) {
+    if (!name) {
       return NextResponse.json(
-        { error: 'Template name and body content are required.' },
+        { error: 'Template name is required.' },
+        { status: 400 }
+      );
+    }
+
+    if (channel === 'EMAIL' && !htmlBody && !body) {
+      return NextResponse.json(
+        { error: 'Email template HTML body content is required.' },
         { status: 400 }
       );
     }
@@ -85,7 +110,7 @@ export async function POST(req: Request) {
       .replace(/[^a-z0-9_]/g, '_')
       .replace(/_+/g, '_');
 
-    // Check duplicate name
+    // Check duplicate name per tenant
     const existing = await db.template.findFirst({
       where: { tenantId, name: formattedName },
       select: { id: true, name: true },
@@ -99,24 +124,31 @@ export async function POST(req: Request) {
 
     let initialStatus = 'DRAFT';
 
-    if (autoSubmit) {
-      // Stub Meta API Submission
-      // TODO: WhatsApp Business API / Meta Graph API Submission
-      // POST https://graph.facebook.com/v18.0/{WABA_ID}/message_templates
-      // Authorization: Bearer {META_ACCESS_TOKEN}
-      // Payload: { name: formattedName, category, language, components: [...] }
+    if (autoSubmit && channel === 'WHATSAPP') {
       console.log(`[META TEMPLATE STUB] Submitting template "${formattedName}" to Meta WABA endpoint...`);
       initialStatus = 'PENDING';
+    } else if (channel === 'EMAIL') {
+      // Email templates don't require Meta approval; they are immediately APPROVED
+      initialStatus = 'APPROVED';
     }
+
+    const finalHtml = htmlBody || body || '';
+    const finalPlain = plainText || (finalHtml ? finalHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '');
 
     const template = await db.template.create({
       data: {
         tenantId,
         name: formattedName,
+        channel: channel as any,
         category,
         language,
-        body,
-        content: body, // compatibility
+        subject: subject || null,
+        previewText: previewText || null,
+        htmlBody: finalHtml || null,
+        plainText: finalPlain || null,
+        jsonDesign: jsonDesign || null,
+        body: body || finalPlain || '',
+        content: body || finalPlain || '',
         header,
         footer,
         ctaButtons: ctaButtons || [],

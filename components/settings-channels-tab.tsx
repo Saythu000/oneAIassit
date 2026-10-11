@@ -14,7 +14,13 @@ import {
   ShieldCheck, 
   Power,
   Sliders,
-  Sparkles
+  Sparkles,
+  Mail,
+  Globe,
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 function InstagramIcon({ className = "w-5 h-5" }: { className?: string }) {
@@ -64,6 +70,181 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
   const [igAccessToken, setIgAccessToken] = useState('');
   const [igSaveSuccess, setIgSaveSuccess] = useState(false);
   const [igError, setIgError] = useState('');
+
+  // Email Channel States
+  const [emailProvider, setEmailProvider] = useState<'RESEND' | 'SES' | 'SENDGRID' | 'SMTP'>('RESEND');
+  const [emailApiKey, setEmailApiKey] = useState('');
+  const [emailFromName, setEmailFromName] = useState('');
+  const [emailFromEmail, setEmailFromEmail] = useState('');
+  const [emailReplyTo, setEmailReplyTo] = useState('');
+  const [emailDailyQuota, setEmailDailyQuota] = useState(1000);
+  const [emailHourlyRate, setEmailHourlyRate] = useState(100);
+  const [emailSaveSuccess, setEmailSaveSuccess] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [newDomain, setNewDomain] = useState('');
+  const [domainError, setDomainError] = useState('');
+  const [expandedDomainId, setExpandedDomainId] = useState<string | null>(null);
+  const [copiedValue, setCopiedValue] = useState<string | null>(null);
+
+  // Email Queries & Mutations
+  const { data: emailConfigData, refetch: refetchEmailConfig } = useQuery({
+    queryKey: ['emailConfig', tenantId],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/email/config');
+      if (!res.ok) throw new Error('Failed to fetch email config');
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const { data: emailDomainsData = [], refetch: refetchEmailDomains } = useQuery({
+    queryKey: ['emailDomains', tenantId],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/email/domains');
+      if (!res.ok) throw new Error('Failed to fetch domains');
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const { data: deliverabilityData, refetch: refetchDeliverability } = useQuery({
+    queryKey: ['emailDeliverability', tenantId],
+    queryFn: async () => {
+      const res = await fetch('/api/channels/email/deliverability');
+      if (!res.ok) throw new Error('Failed to fetch deliverability metrics');
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const resumeSendingMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/channels/email/deliverability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'RESUME_SENDING' }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to resume sending');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchDeliverability();
+      refetchEmailConfig();
+    },
+  });
+
+  useEffect(() => {
+    if (emailConfigData) {
+      if (emailConfigData.provider) setEmailProvider(emailConfigData.provider);
+      if (emailConfigData.apiKeyMasked) setEmailApiKey(emailConfigData.apiKeyMasked);
+      if (emailConfigData.fromName) setEmailFromName(emailConfigData.fromName);
+      if (emailConfigData.fromEmail) setEmailFromEmail(emailConfigData.fromEmail);
+      if (emailConfigData.replyToEmail) setEmailReplyTo(emailConfigData.replyToEmail);
+      if (emailConfigData.dailySendQuota) setEmailDailyQuota(emailConfigData.dailySendQuota);
+      if (emailConfigData.hourlySendRate) setEmailHourlyRate(emailConfigData.hourlySendRate);
+    }
+  }, [emailConfigData]);
+
+  const saveEmailMutation = useMutation({
+    mutationFn: async () => {
+      setEmailError('');
+      setEmailSaveSuccess(false);
+      const res = await fetch('/api/settings/email/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: emailProvider,
+          apiKey: emailApiKey,
+          fromName: emailFromName,
+          fromEmail: emailFromEmail,
+          replyToEmail: emailReplyTo,
+          dailySendQuota: emailDailyQuota,
+          hourlySendRate: emailHourlyRate,
+        }),
+      });
+      if (!res.ok) {
+        let errMsg = 'Failed to save email settings';
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {
+          errMsg = `Server responded with ${res.status}: ${res.statusText || 'Error'}`;
+        }
+        throw new Error(errMsg);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setEmailSaveSuccess(true);
+      refetchEmailConfig();
+      setTimeout(() => setEmailSaveSuccess(false), 5000);
+    },
+    onError: (err: any) => {
+      setEmailError(err.message);
+    },
+  });
+
+  const addDomainMutation = useMutation({
+    mutationFn: async () => {
+      setDomainError('');
+      const res = await fetch('/api/settings/email/domains', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: newDomain }),
+      });
+      if (!res.ok) {
+        let errMsg = 'Failed to register domain';
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {
+          errMsg = `Server responded with ${res.status}: ${res.statusText || 'Error'}`;
+        }
+        throw new Error(errMsg);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setNewDomain('');
+      refetchEmailDomains();
+    },
+    onError: (err: any) => {
+      setDomainError(err.message);
+    },
+  });
+
+  const verifyDomainMutation = useMutation({
+    mutationFn: async (domain: string) => {
+      const res = await fetch('/api/settings/email/domains/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain }),
+      });
+      if (!res.ok) {
+        let errMsg = 'Verification failed';
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {
+          errMsg = `Server responded with ${res.status}: ${res.statusText || 'Error'}`;
+        }
+        throw new Error(errMsg);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchEmailDomains();
+    },
+  });
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedValue(text);
+    setTimeout(() => setCopiedValue(null), 2000);
+  };
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -744,6 +925,411 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
               {saveIgMutation.isPending ? 'Connecting...' : 'Save & Connect Instagram'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Native Email Marketing & Deliverability Gateway Card */}
+      <div className="bg-white border border-[#c3c6d7] rounded-2xl p-6 shadow-sm space-y-6">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#004ac6]">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-[#1c1b1f]">Native Email Marketing & Deliverability</h4>
+              <p className="text-xs text-[#737686]">
+                Multi-tenant sending infrastructure with SPF, DKIM, and DMARC verification
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {emailConfigData?.isAutoPaused ? (
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" /> Auto-Paused (High Complaints)
+              </span>
+            ) : emailConfigData?.configured ? (
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Active & Connected
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                Not Configured
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Provider Selection */}
+        <div>
+          <label className="block text-xs font-bold text-gray-700 mb-2">Select Email Delivery Provider</label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { id: 'RESEND', label: 'Resend', badge: 'Recommended' },
+              { id: 'SES', label: 'Amazon SES', badge: 'Enterprise' },
+              { id: 'SENDGRID', label: 'SendGrid', badge: 'Standard' },
+              { id: 'SMTP', label: 'Custom SMTP', badge: 'Self-Hosted' },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setEmailProvider(p.id as any)}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  emailProvider === p.id
+                    ? 'border-[#004ac6] bg-blue-50/50 shadow-sm'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-xs font-bold ${emailProvider === p.id ? 'text-[#004ac6]' : 'text-gray-800'}`}>
+                    {p.label}
+                  </span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                    {p.badge}
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-500">
+                  {p.id === 'RESEND' ? 'Automated DKIM/DMARC' : p.id === 'SES' ? 'High-volume AWS infra' : p.id === 'SENDGRID' ? 'Twilio SendGrid engine' : 'Direct SMTP relay'}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Credentials & Sender Details */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              {emailProvider === 'SMTP' ? 'SMTP Host & Port / Password' : `${emailProvider} API Key`}
+              <span className="text-[10px] font-normal text-emerald-600 ml-2 font-mono">🔒 AES-256-GCM Encrypted</span>
+            </label>
+            <input
+              type="password"
+              value={emailApiKey}
+              onChange={(e) => setEmailApiKey(e.target.value)}
+              placeholder="re_1234567890abcdef..."
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6] font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">From Sender Name</label>
+            <input
+              type="text"
+              value={emailFromName}
+              onChange={(e) => setEmailFromName(e.target.value)}
+              placeholder="e.g. Maya from Apex Health"
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">From Sender Email</label>
+            <input
+              type="email"
+              value={emailFromEmail}
+              onChange={(e) => setEmailFromEmail(e.target.value)}
+              placeholder="e.g. care@apexinsurance.com"
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Reply-To Address (Optional)</label>
+            <input
+              type="email"
+              value={emailReplyTo}
+              onChange={(e) => setEmailReplyTo(e.target.value)}
+              placeholder="e.g. support@apexinsurance.com"
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6]"
+            />
+          </div>
+        </div>
+
+        {/* Sending Domains & DNS Verification Table */}
+        <div className="pt-2 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h5 className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-[#004ac6]" />
+                Sending Domains & DNS Authentication (SPF, DKIM, DMARC)
+              </h5>
+              <p className="text-[11px] text-gray-500">
+                Verify your domain DNS to achieve 99%+ deliverability and prevent spam folder placement.
+              </p>
+            </div>
+          </div>
+
+          {/* Add Domain Input */}
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              value={newDomain}
+              onChange={(e) => setNewDomain(e.target.value)}
+              placeholder="Enter domain (e.g. yourcompany.com)"
+              className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6]"
+            />
+            <button
+              type="button"
+              onClick={() => addDomainMutation.mutate()}
+              disabled={addDomainMutation.isPending || !newDomain}
+              className="px-4 py-2 bg-[#004ac6] hover:bg-[#003da6] text-white font-bold text-xs rounded-lg transition disabled:opacity-50"
+            >
+              {addDomainMutation.isPending ? 'Adding...' : '+ Add Domain'}
+            </button>
+          </div>
+
+          {domainError && <p className="text-xs text-rose-600 font-semibold mb-3">{domainError}</p>}
+
+          {/* Domain List Table */}
+          {emailDomainsData && emailDomainsData.length > 0 ? (
+            <div className="space-y-3">
+              {emailDomainsData.map((d: any) => {
+                const isExpanded = expandedDomainId === d.id;
+                const dkimArray = Array.isArray(d.dkimRecords) ? d.dkimRecords : [];
+                return (
+                  <div key={d.id} className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50/50">
+                    <div className="flex items-center justify-between p-3 bg-white border-b border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-gray-900">{d.domain}</span>
+                        {d.status === 'VERIFIED' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Verified
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                            <RefreshCw className="w-3 h-3 animate-spin" /> Pending DNS
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => verifyDomainMutation.mutate(d.domain)}
+                          disabled={verifyDomainMutation.isPending}
+                          className="px-3 py-1 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold text-[11px] rounded-lg transition flex items-center gap-1.5 shadow-sm"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${verifyDomainMutation.isPending ? 'animate-spin' : ''}`} />
+                          Verify DNS
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedDomainId(isExpanded ? null : d.id)}
+                          className="p-1 hover:bg-gray-100 rounded text-gray-500"
+                        >
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* DNS Records Expandable Drawer */}
+                    {isExpanded && (
+                      <div className="p-3 bg-gray-50 text-[11px] space-y-2 border-t border-gray-100">
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                          Copy these records into your DNS provider (Cloudflare, GoDaddy, Route53):
+                        </p>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left bg-white border border-gray-200 rounded-lg overflow-hidden text-[10px]">
+                            <thead className="bg-gray-50 border-b border-gray-200 font-bold text-gray-600">
+                              <tr>
+                                <th className="p-2">Type</th>
+                                <th className="p-2">Host / Name</th>
+                                <th className="p-2">Value</th>
+                                <th className="p-2">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 font-mono">
+                              {/* SPF */}
+                              <tr>
+                                <td className="p-2 font-bold text-blue-600">TXT (SPF)</td>
+                                <td className="p-2">{d.spfRecord?.name || '@'}</td>
+                                <td className="p-2 truncate max-w-[200px] flex items-center gap-1">
+                                  <span>{d.spfRecord?.value || 'v=spf1 include:resend.com ~all'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy(d.spfRecord?.value || 'v=spf1 include:resend.com ~all')}
+                                    className="text-gray-400 hover:text-gray-700"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </td>
+                                <td className="p-2 text-emerald-600 font-bold">{d.status === 'VERIFIED' ? '✓' : 'Pending'}</td>
+                              </tr>
+                              {/* DKIM */}
+                              {dkimArray.map((dk: any, idx: number) => (
+                                <tr key={idx}>
+                                  <td className="p-2 font-bold text-purple-600">CNAME (DKIM)</td>
+                                  <td className="p-2">{dk.name || `resend._domainkey.${d.domain}`}</td>
+                                  <td className="p-2 truncate max-w-[200px] flex items-center gap-1">
+                                    <span>{dk.value || 'dkim.resend.com'}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopy(dk.value || 'dkim.resend.com')}
+                                      className="text-gray-400 hover:text-gray-700"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                    </button>
+                                  </td>
+                                  <td className="p-2 text-emerald-600 font-bold">{d.status === 'VERIFIED' ? '✓' : 'Pending'}</td>
+                                </tr>
+                              ))}
+                              {/* DMARC */}
+                              <tr>
+                                <td className="p-2 font-bold text-indigo-600">TXT (DMARC)</td>
+                                <td className="p-2">{d.dmarcRecord?.name || `_dmarc.${d.domain}`}</td>
+                                <td className="p-2 truncate max-w-[200px] flex items-center gap-1">
+                                  <span>{d.dmarcRecord?.value || 'v=DMARC1; p=none;'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy(d.dmarcRecord?.value || 'v=DMARC1; p=none;')}
+                                    className="text-gray-400 hover:text-gray-700"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </td>
+                                <td className="p-2 text-emerald-600 font-bold">{d.status === 'VERIFIED' ? '✓' : 'Pending'}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-4 border border-dashed border-gray-200 rounded-xl text-center text-xs text-gray-500">
+              No sending domains registered yet. Add your brand domain above to generate SPF and DKIM records.
+            </div>
+          )}
+        </div>
+
+        {/* Deliverability & Reputation Health Section */}
+        <div className="pt-4 border-t border-gray-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h5 className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#004ac6]" />
+                Sender Reputation & Deliverability Health
+              </h5>
+              <p className="text-[11px] text-gray-500">
+                Automated compliance monitoring: warning at 0.1% complaints, safety auto-pause circuit breaker at 0.3%.
+              </p>
+            </div>
+            {deliverabilityData && (
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                deliverabilityData.healthStatus === 'HEALTHY'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : deliverabilityData.healthStatus === 'WARNING'
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-rose-50 text-rose-700 border-rose-200'
+              }`}>
+                {deliverabilityData.healthStatus === 'HEALTHY' && '● Sender Health: Optimal'}
+                {deliverabilityData.healthStatus === 'WARNING' && '▲ Warning: Elevated Complaints'}
+                {deliverabilityData.healthStatus === 'PAUSED' && '✕ Sending Auto-Paused'}
+              </span>
+            )}
+          </div>
+
+          {/* Alert Banners */}
+          {deliverabilityData?.isAutoPaused && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-rose-900">
+                    Sending Paused by Deliverability Circuit Breaker
+                  </p>
+                  <p className="text-[11px] text-rose-700">
+                    Spam complaint rate has reached {deliverabilityData?.metrics?.complaintRate || 0}%, exceeding the 0.3% threshold.
+                    Clean your list and remove unengaged contacts before resuming.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => resumeSendingMutation.mutate()}
+                disabled={resumeSendingMutation.isPending}
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition whitespace-nowrap shadow-sm disabled:opacity-50"
+              >
+                {resumeSendingMutation.isPending ? 'Resuming...' : 'Resume Sending'}
+              </button>
+            </div>
+          )}
+
+          {deliverabilityData?.isWarning && !deliverabilityData?.isAutoPaused && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <p className="text-xs text-amber-900 font-medium">
+                <strong>Deliverability Warning:</strong> Complaint rate is at {deliverabilityData?.metrics?.complaintRate}%. Approaching the 0.3% auto-pause limit. Check your email frequency and unsubscribe headers.
+              </p>
+            </div>
+          )}
+
+          {/* Metric Meters */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Delivered</span>
+              <span className="text-base font-extrabold text-slate-800">
+                {(deliverabilityData?.metrics?.totalDelivered || 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Complaint Rate</span>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-base font-extrabold ${
+                  (deliverabilityData?.metrics?.complaintRate || 0) >= 0.3
+                    ? 'text-rose-600'
+                    : (deliverabilityData?.metrics?.complaintRate || 0) >= 0.1
+                    ? 'text-amber-600'
+                    : 'text-slate-800'
+                }`}>
+                  {deliverabilityData?.metrics?.complaintRate ?? 0}%
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold">(max 0.1%)</span>
+              </div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Bounce Rate</span>
+              <span className="text-base font-extrabold text-slate-800">
+                {deliverabilityData?.metrics?.bounceRate ?? 0}%
+              </span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Warm-Up Stage</span>
+              <span className="text-xs font-extrabold text-indigo-700 block mt-1">
+                {deliverabilityData?.warmup?.recommendedStage || 'Stage 1'}
+              </span>
+              <span className="text-[9px] text-slate-400 font-semibold">
+                {deliverabilityData?.warmup?.dailyQuota || 1000}/day ({deliverabilityData?.warmup?.hourlyRate || 100}/hr)
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Feedback Messages */}
+        {emailError && <p className="text-xs text-rose-600 font-semibold">{emailError}</p>}
+        {emailSaveSuccess && (
+          <p className="text-xs text-emerald-700 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 font-bold">
+            ✓ Email configuration and provider credentials securely encrypted and saved!
+          </p>
+        )}
+        {copiedValue && (
+          <p className="text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-200">
+            Copied DNS record to clipboard!
+          </p>
+        )}
+
+        {/* Save Button */}
+        <div className="flex justify-end pt-2 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={() => saveEmailMutation.mutate()}
+            disabled={saveEmailMutation.isPending || !emailFromName || !emailFromEmail}
+            className="px-5 py-2.5 bg-[#004ac6] hover:bg-[#003da6] text-white font-bold text-xs rounded-xl shadow-sm transition disabled:opacity-50"
+          >
+            {saveEmailMutation.isPending ? 'Saving...' : 'Save Email Configuration'}
+          </button>
         </div>
       </div>
 

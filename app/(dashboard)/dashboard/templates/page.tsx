@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { EmailTemplateEditorModal } from '@/components/email/EmailTemplateEditorModal';
 
 export interface CTAButton {
   type: 'QUICK_REPLY' | 'URL' | 'PHONE';
@@ -12,8 +13,12 @@ export interface CTAButton {
 export interface TemplateItem {
   id: string;
   name: string;
+  channel?: 'WHATSAPP' | 'EMAIL' | 'INSTAGRAM';
   category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
   language: string;
+  subject?: string;
+  htmlBody?: string;
+  plainText?: string;
   body: string;
   headerType?: string;
   header?: string;
@@ -33,12 +38,14 @@ export default function WhatsAppTemplateManagerPage() {
 
   // Filters
   const [search, setSearch] = useState('');
+  const [channelFilter, setChannelFilter] = useState<'ALL' | 'WHATSAPP' | 'EMAIL'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // View state: 'list' | 'create'
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   // Form State
   const [name, setName] = useState('');
@@ -70,6 +77,7 @@ export default function WhatsAppTemplateManagerPage() {
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
+      if (channelFilter !== 'ALL') params.append('channel', channelFilter);
       if (categoryFilter !== 'ALL') params.append('category', categoryFilter);
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
 
@@ -86,7 +94,7 @@ export default function WhatsAppTemplateManagerPage() {
 
   useEffect(() => {
     fetchTemplates();
-  }, [search, categoryFilter, statusFilter]);
+  }, [search, channelFilter, categoryFilter, statusFilter]);
 
   const handleNameChange = (val: string) => {
     // Format to lowercase_with_underscores
@@ -414,6 +422,14 @@ export default function WhatsAppTemplateManagerPage() {
 
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setIsEmailModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 flex items-center gap-2 shadow-sm bg-indigo-600 text-white hover:bg-indigo-700"
+          >
+            <span className="material-symbols-outlined text-lg">mail</span>
+            <span>Design Email Template</span>
+          </button>
+
+          <button
             onClick={() => {
               if (activeTab === 'create') {
                 setActiveTab('list');
@@ -428,7 +444,7 @@ export default function WhatsAppTemplateManagerPage() {
             <span className="material-symbols-outlined text-lg">
               {activeTab === 'create' ? 'format_list_bulleted' : 'add'}
             </span>
-            <span>{activeTab === 'create' ? 'Back to Templates' : 'Create Template'}</span>
+            <span>{activeTab === 'create' ? 'Back to Templates' : 'Create WhatsApp Template'}</span>
           </button>
         </div>
       </div>
@@ -491,6 +507,16 @@ export default function WhatsAppTemplateManagerPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <select
+                value={channelFilter}
+                onChange={(e: any) => setChannelFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+              >
+                <option value="ALL">All Channels</option>
+                <option value="WHATSAPP">WhatsApp</option>
+                <option value="EMAIL">Email Marketing</option>
+              </select>
+
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
@@ -556,9 +582,22 @@ export default function WhatsAppTemplateManagerPage() {
                     <div>
                       {/* Top status & category */}
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-slate-100 text-slate-700">
-                          {tpl.category}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {tpl.channel === 'EMAIL' ? (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-xs">mail</span>
+                              Email
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-xs">chat</span>
+                              WhatsApp
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-slate-100 text-slate-700">
+                            {tpl.category}
+                          </span>
+                        </div>
 
                         {tpl.status === 'APPROVED' && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -1032,6 +1071,35 @@ export default function WhatsAppTemplateManagerPage() {
           </div>
         </div>
       )}
+
+      {/* Visual Email Template Editor Modal */}
+      <EmailTemplateEditorModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        onSave={async (tplData) => {
+          const res = await fetch('/api/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: tplData.name,
+              channel: 'EMAIL',
+              subject: tplData.subject,
+              previewText: tplData.previewText,
+              htmlBody: tplData.htmlBody,
+              plainText: tplData.plainText,
+              jsonDesign: tplData.jsonDesign,
+              body: tplData.plainText,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            setActionMessage({ type: 'error', text: data.error || 'Failed to save email template' });
+          } else {
+            setActionMessage({ type: 'success', text: `Email template "${tplData.name}" created successfully!` });
+            fetchTemplates();
+          }
+        }}
+      />
     </div>
   );
 }

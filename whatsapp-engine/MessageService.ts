@@ -85,12 +85,29 @@ export class MessageService {
       }
     }
 
+    // 4. Determine conversation channel & transport
+    let convChannel = 'WHATSAPP';
     if (params.conversationId) {
+      try {
+        const conv = await db.conversation.findUnique({
+          where: { id: params.conversationId },
+          select: { channel: true, customer: { select: { email: true, primaryPhone: true } } },
+        });
+        if (conv?.channel) {
+          convChannel = conv.channel;
+        }
+        if (convChannel === 'EMAIL' && conv?.customer?.email) {
+          targetPhone = conv.customer.email;
+        }
+      } catch {}
+    }
+
+    if (params.conversationId && convChannel !== 'EMAIL') {
       try {
         const channel = await db.customerChannel.findFirst({
           where: {
             tenantId,
-            channel: 'WHATSAPP',
+            channel: convChannel as any,
             customer: { conversations: { some: { id: params.conversationId } } },
           },
           include: { customer: true },
@@ -114,20 +131,6 @@ export class MessageService {
       } catch (err) {
         console.warn(`[MessageService] CustomerChannel lookup fallback for ${params.conversationId}:`, err);
       }
-    }
-
-    // 4. Determine conversation channel & transport
-    let convChannel = 'WHATSAPP';
-    if (params.conversationId) {
-      try {
-        const conv = await db.conversation.findUnique({
-          where: { id: params.conversationId },
-          select: { channel: true },
-        });
-        if (conv?.channel) {
-          convChannel = conv.channel;
-        }
-      } catch {}
     }
 
     const transport = TransportManager.getTransport(tenantId, convChannel);

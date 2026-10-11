@@ -10,10 +10,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import WhatsAppChatView from '@/components/chat/WhatsAppChatView';
 import IMessageChatView from '@/components/chat/IMessageChatView';
 import InstagramChatView from '@/components/chat/InstagramChatView';
+import EmailChatView from '@/components/chat/EmailChatView';
 
 interface Conversation {
   id: string;
-  channel?: 'WHATSAPP' | 'IMESSAGE' | 'INSTAGRAM' | 'SMS' | string;
+  channel?: 'WHATSAPP' | 'IMESSAGE' | 'INSTAGRAM' | 'EMAIL' | 'SMS' | string;
   status: 'OPEN' | 'CLOSED' | 'PENDING';
   lastMessageAt: string;
   needsEscalation: boolean;
@@ -59,9 +60,9 @@ export default function InboxPage() {
   const tenantId = info?.tenantId;
 
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
-  const [selectedChannel, setSelectedChannel] = useState<'ALL' | 'WHATSAPP' | 'IMESSAGE' | 'INSTAGRAM'>('ALL');
+  const [selectedChannel, setSelectedChannel] = useState<'ALL' | 'WHATSAPP' | 'IMESSAGE' | 'INSTAGRAM' | 'EMAIL'>('ALL');
   const [replyText, setReplyText] = useState('');
-  const [activeTab, setActiveTab] = useState<'ALL' | 'UNREAD' | 'AI' | 'ESCALATED' | 'IMESSAGE' | 'INSTAGRAM' | 'PENDING' | 'CLOSED'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'UNREAD' | 'AI' | 'ESCALATED' | 'IMESSAGE' | 'INSTAGRAM' | 'EMAIL' | 'PENDING' | 'CLOSED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [showTemplatesDropdown, setShowTemplatesDropdown] = useState(false);
   const [isIntakeExpanded, setIsIntakeExpanded] = useState(true);
@@ -327,6 +328,7 @@ export default function InboxPage() {
     if (activeTab === 'ESCALATED') return conv.needsEscalation;
     if (activeTab === 'IMESSAGE') return (conv as any).channel === 'IMESSAGE';
     if (activeTab === 'INSTAGRAM') return (conv as any).channel === 'INSTAGRAM';
+    if (activeTab === 'EMAIL') return (conv as any).channel === 'EMAIL';
     if (activeTab === 'PENDING') return conv.status === 'PENDING';
 
     return true;
@@ -392,6 +394,18 @@ export default function InboxPage() {
             <span className="w-2 h-2 rounded-full bg-rose-500" />
             Instagram Direct
           </button>
+          <button
+            onClick={() => setSelectedChannel('EMAIL')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border',
+              selectedChannel === 'EMAIL'
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                : 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100'
+            )}
+          >
+            <span className="w-2 h-2 rounded-full bg-indigo-400" />
+            Two-Way Email
+          </button>
         </div>
 
         <div className="text-[11px] text-[#737686] font-medium hidden sm:block">
@@ -432,7 +446,7 @@ export default function InboxPage() {
 
         {/* Tab Selection */}
         <div className="flex px-2 border-b border-[#c3c6d7]/60 overflow-x-auto shrink-0 scrollbar-none">
-          {(['ALL', 'UNREAD', 'AI', 'ESCALATED', 'IMESSAGE', 'INSTAGRAM', 'PENDING', 'CLOSED'] as const).map((tab) => (
+          {(['ALL', 'UNREAD', 'AI', 'ESCALATED', 'EMAIL', 'IMESSAGE', 'INSTAGRAM', 'PENDING', 'CLOSED'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -443,7 +457,7 @@ export default function InboxPage() {
                   : 'border-transparent text-[#737686] hover:text-[#1c1b1f]'
               )}
             >
-              {tab === 'AI' ? 'AI Handling' : tab === 'IMESSAGE' ? 'iMessage' : tab.toLowerCase()}
+              {tab === 'AI' ? 'AI Handling' : tab === 'IMESSAGE' ? 'iMessage' : tab === 'EMAIL' ? 'Email' : tab.toLowerCase()}
             </button>
           ))}
         </div>
@@ -492,9 +506,11 @@ export default function InboxPage() {
                         ? "bg-sky-100 text-sky-800 border-sky-200"
                         : (conv as any).channel === 'INSTAGRAM'
                         ? "bg-gradient-to-r from-purple-100 to-rose-100 text-purple-900 border-purple-200"
+                        : (conv as any).channel === 'EMAIL'
+                        ? "bg-indigo-100 text-indigo-800 border-indigo-200"
                         : "bg-emerald-100 text-emerald-800 border-emerald-200"
                     )}>
-                      {(conv as any).channel === 'IMESSAGE' ? 'iMessage' : (conv as any).channel === 'INSTAGRAM' ? 'Instagram' : 'WhatsApp'}
+                      {(conv as any).channel === 'IMESSAGE' ? 'iMessage' : (conv as any).channel === 'INSTAGRAM' ? 'Instagram' : (conv as any).channel === 'EMAIL' ? 'Email' : 'WhatsApp'}
                     </span>
                     <span className={cn(
                       "px-1.5 py-0.5 text-[9px] rounded font-bold uppercase tracking-wider border",
@@ -577,6 +593,8 @@ export default function InboxPage() {
               <IMessageChatView {...commonProps} />
             ) : chan === 'INSTAGRAM' ? (
               <InstagramChatView {...commonProps} />
+            ) : chan === 'EMAIL' ? (
+              <EmailChatView {...commonProps} />
             ) : (
               <WhatsAppChatView {...commonProps} />
             );

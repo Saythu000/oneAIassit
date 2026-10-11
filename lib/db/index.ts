@@ -4,13 +4,24 @@ import { Pool } from 'pg';
 import dns from 'dns';
 
 // Ensure IPv4 is prioritized for database host resolution to prevent IPv6 ENETUNREACH/ETIMEDOUT on dual-stack environments
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 const origLookup = dns.lookup;
 (dns as any).lookup = function (hostname: any, options: any, callback: any) {
+  let cb = callback;
+  let opts = options;
   if (typeof options === 'function') {
-    callback = options;
-    options = {};
+    cb = options;
+    opts = {};
   }
-  return origLookup(hostname, { ...options, family: 4 }, callback);
+  return origLookup(hostname, { ...opts, family: 4 }, (err: any, address: any, family: any) => {
+    if (opts && opts.all && !Array.isArray(address) && address) {
+      return cb(err, [{ address, family: family || 4 }]);
+    }
+    return cb(err, address, family);
+  });
 };
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient; pgPool: Pool };

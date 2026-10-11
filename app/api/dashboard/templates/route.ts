@@ -14,7 +14,13 @@ export async function GET() {
         tenantId: true,
         name: true,
         category: true,
+        channel: true,
         language: true,
+        subject: true,
+        previewText: true,
+        htmlBody: true,
+        plainText: true,
+        jsonDesign: true,
         body: true,
         content: true,
         header: true,
@@ -39,20 +45,44 @@ export async function POST(req: Request) {
     const db = getTenantPrisma(tenantId, role);
 
     const body = await req.json();
-    const { name, category, language, body: templateBody, header, footer, ctaButtons, status } = body;
+    const {
+      name,
+      channel = 'WHATSAPP',
+      category,
+      language,
+      body: templateBody,
+      subject,
+      previewText,
+      htmlBody,
+      plainText,
+      jsonDesign,
+      header,
+      footer,
+      ctaButtons,
+      status,
+    } = body;
 
-    if (!name || !templateBody) {
-      return NextResponse.json({ error: 'Name and Body template are required' }, { status: 400 });
+    if (!name || (!templateBody && !htmlBody)) {
+      return NextResponse.json({ error: 'Name and template body content are required' }, { status: 400 });
     }
+
+    const finalHtml = htmlBody || templateBody || '';
+    const finalPlain = plainText || (finalHtml ? finalHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '');
 
     const template = await db.template.create({
       data: {
         tenantId,
         name,
+        channel: channel as any,
         category: category || 'MARKETING',
         language: language || 'en',
-        body: templateBody,
-        content: templateBody, // keep content in sync
+        subject: subject || null,
+        previewText: previewText || null,
+        htmlBody: finalHtml || null,
+        plainText: finalPlain || null,
+        jsonDesign: jsonDesign || null,
+        body: templateBody || finalPlain || '',
+        content: templateBody || finalPlain || '', // keep content in sync
         header: header || null,
         footer: footer || null,
         ctaButtons: ctaButtons || null,

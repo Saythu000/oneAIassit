@@ -4,6 +4,7 @@ import { openwaSessions, openwaQrCodes } from '../openwa-logic';
 import { MetaCloudTransportAdapter } from './MetaCloudTransportAdapter';
 import { IMessageCloudTransportAdapter } from './IMessageCloudTransportAdapter';
 import { InstagramCloudTransportAdapter } from './InstagramCloudTransportAdapter';
+import { EmailTransportAdapter } from '../../lib/email/EmailTransportAdapter';
 import { getTenantPrisma } from '../../lib/db/index';
 import { jidNormalizedUser } from '@whiskeysockets/baileys';
 
@@ -184,6 +185,9 @@ export class TransportManager {
     }
     if (channel === 'INSTAGRAM') {
       return new InstagramCloudTransportAdapter(tenantId);
+    }
+    if (channel === 'EMAIL') {
+      return new EmailTransportAdapter(tenantId);
     }
 
     let transport = this.instances.get(tenantId);

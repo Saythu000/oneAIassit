@@ -12,8 +12,11 @@ type TemplateStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED';
 interface Template {
   id: string;
   name: string;
+  channel?: 'WHATSAPP' | 'EMAIL' | 'INSTAGRAM';
   category: TemplateCategory;
   language: string;
+  subject?: string | null;
+  htmlBody?: string | null;
   body: string;
   header?: string | null;
   footer?: string | null;
@@ -25,6 +28,9 @@ interface Template {
 interface Campaign {
   id: string;
   name: string;
+  channel?: 'WHATSAPP' | 'EMAIL' | 'INSTAGRAM';
+  subject?: string | null;
+  previewText?: string | null;
   templateId?: string | null;
   recipientFilter?: any | null;
   scheduledAt?: string | null;
@@ -49,8 +55,16 @@ export default function BroadcastCenterPage() {
 
   // Form State
   const [campaignName, setCampaignName] = useState('');
+  const [campaignChannel, setCampaignChannel] = useState<'WHATSAPP' | 'EMAIL'>('WHATSAPP');
+  const [emailSubject, setEmailSubject] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
-  const [recipientType, setRecipientType] = useState<'all' | 'tag' | 'stage' | 'date_range'>('all');
+  const [isAbTest, setIsAbTest] = useState(false);
+  const [abSubjectB, setAbSubjectB] = useState('');
+  const [abTemplateIdB, setAbTemplateIdB] = useState('');
+  const [abSplit, setAbSplit] = useState(50);
+  const [abMetric, setAbMetric] = useState<'CLICKS' | 'OPENS'>('CLICKS');
+  const [recipientType, setRecipientType] = useState<'all' | 'tag' | 'stage' | 'date_range' | 'email_engagement'>('all');
+  const [emailActivityFilter, setEmailActivityFilter] = useState<'OPENED_LAST_30_DAYS' | 'CLICKED_ANY' | 'NEVER_BOUNCED'>('OPENED_LAST_30_DAYS');
   const [filterValue, setFilterValue] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -107,6 +121,16 @@ export default function BroadcastCenterPage() {
     refetchInterval: 3000, // Poll every 3 seconds for live delivery/read updates
   });
 
+  const { data: deliverabilityData } = useQuery({
+    queryKey: ['emailDeliverability', tenantId],
+    queryFn: async () => {
+      const res = await fetch('/api/channels/email/deliverability');
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!tenantId && campaignChannel === 'EMAIL',
+  });
+
   // Socket.io Live Status Listener
   useEffect(() => {
     if (!tenantId) return;
@@ -137,11 +161,13 @@ export default function BroadcastCenterPage() {
     const fetchPreviewCounts = async () => {
       setPreviewLoading(true);
       try {
-        let url = `/api/dashboard/broadcast?preview=true&type=${recipientType}`;
+        let url = `/api/dashboard/broadcast?preview=true&channel=${campaignChannel}&type=${recipientType}`;
         if (recipientType === 'tag' || recipientType === 'stage') {
           url += `&value=${encodeURIComponent(filterValue)}`;
         } else if (recipientType === 'date_range') {
           url += `&start=${encodeURIComponent(filterStartDate)}&end=${encodeURIComponent(filterEndDate)}`;
+        } else if (recipientType === 'email_engagement') {
+          url += `&emailActivity=${encodeURIComponent(emailActivityFilter)}`;
         }
         const res = await fetch(url);
         if (res.ok) {
@@ -157,7 +183,7 @@ export default function BroadcastCenterPage() {
     };
 
     fetchPreviewCounts();
-  }, [recipientType, filterValue, filterStartDate, filterEndDate]);
+  }, [campaignChannel, recipientType, filterValue, filterStartDate, filterEndDate, emailActivityFilter]);
 
   // Mutations
   const createTemplateMutation = useMutation({
@@ -260,10 +286,18 @@ export default function BroadcastCenterPage() {
 
     sendCampaignMutation.mutate({
       name: campaignName.trim(),
+      channel: campaignChannel,
+      subject: campaignChannel === 'EMAIL' ? emailSubject : undefined,
       templateId: selectedTemplateId,
+      isAbTest: campaignChannel === 'EMAIL' && isAbTest,
+      abSubjectB: isAbTest ? abSubjectB : undefined,
+      abTemplateIdB: isAbTest && abTemplateIdB ? abTemplateIdB : undefined,
+      abTestSplit: isAbTest ? abSplit : undefined,
+      abWinnerMetric: isAbTest ? abMetric : undefined,
       recipientFilter: {
         type: recipientType,
         value: recipientType === 'date_range' ? { start: filterStartDate, end: filterEndDate } : filterValue,
+        emailActivity: recipientType === 'email_engagement' ? emailActivityFilter : undefined,
       },
       scheduledAt,
     });
@@ -412,18 +446,104 @@ export default function BroadcastCenterPage() {
               />
             </div>
 
+            {/* Channel Selector */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-[#49454f] uppercase tracking-wide">
+                Campaign Channel
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCampaignChannel('WHATSAPP');
+                    setSelectedTemplateId('');
+                  }}
+                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                    campaignChannel === 'WHATSAPP'
+                      ? 'border-[#004ac6] bg-[#004ac6]/10 text-[#004ac6]'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">chat</span>
+                  WhatsApp Broadcast
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCampaignChannel('EMAIL');
+                    setSelectedTemplateId('');
+                  }}
+                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                    campaignChannel === 'EMAIL'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">mail</span>
+                  Email Marketing
+                </button>
+              </div>
+
+              {campaignChannel === 'EMAIL' && deliverabilityData?.isAutoPaused && (
+                <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl flex items-center justify-between text-xs text-rose-900 font-semibold animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-rose-600 text-lg">block</span>
+                    <span>
+                      Email sending is auto-paused (Spam complaints: {deliverabilityData.metrics.complaintRate}% &ge; 0.3%).
+                    </span>
+                  </div>
+                  <a
+                    href="/dashboard/settings"
+                    className="text-xs text-rose-700 underline font-bold hover:text-rose-950 whitespace-nowrap ml-2"
+                  >
+                    Channel Settings &rarr;
+                  </a>
+                </div>
+              )}
+
+              {campaignChannel === 'EMAIL' && deliverabilityData?.isWarning && !deliverabilityData?.isAutoPaused && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center gap-2 text-xs text-amber-900 font-semibold animate-in fade-in">
+                  <span className="material-symbols-outlined text-amber-600 text-lg">warning</span>
+                  <span>
+                    Warning: Elevated complaints ({deliverabilityData.metrics.complaintRate}%). Approaching 0.3% auto-pause limit.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {campaignChannel === 'EMAIL' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-[#49454f] uppercase tracking-wide">
+                  Email Subject Line *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Special Offer for Policyholders, {{first_name}}"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className="w-full bg-white border border-[#c3c6d7] rounded-xl px-4 py-2.5 text-xs text-[#1c1b1f] focus:outline-none focus:border-[#004ac6] focus:ring-2 focus:ring-[#004ac6]/10 transition-all font-semibold"
+                />
+              </div>
+            )}
+
             {/* 1. Template Selector */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center">
                 <label className="text-[10px] font-bold text-[#49454f] uppercase tracking-wide">
-                  1. Select WhatsApp Template
+                  1. Select {campaignChannel === 'EMAIL' ? 'Email' : 'WhatsApp'} Template
                 </label>
                 <button
                   type="button"
-                  onClick={() => setIsTemplateModalOpen(true)}
+                  onClick={() => {
+                    if (campaignChannel === 'EMAIL') {
+                      window.location.href = '/dashboard/templates';
+                    } else {
+                      setIsTemplateModalOpen(true);
+                    }
+                  }}
                   className="text-[10px] text-[#004ac6] font-bold hover:underline"
                 >
-                  + Create New Template
+                  + {campaignChannel === 'EMAIL' ? 'Manage Email Templates' : 'Create New Template'}
                 </button>
               </div>
               {templatesLoading ? (
@@ -432,26 +552,94 @@ export default function BroadcastCenterPage() {
                 <select
                   suppressHydrationWarning
                   value={selectedTemplateId}
-                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedTemplateId(e.target.value);
+                    const chosen = templates.find((t) => t.id === e.target.value);
+                    if (chosen && chosen.subject && !emailSubject) {
+                      setEmailSubject(chosen.subject);
+                    }
+                  }}
                   className="w-full bg-white border border-[#c3c6d7] rounded-xl px-4 py-2.5 text-xs text-[#1c1b1f] focus:outline-none focus:border-[#004ac6] transition-all font-semibold"
                 >
-                  <option value="">-- Choose Approved Template --</option>
-                  {templates.map((tpl) => (
-                    <option
-                      key={tpl.id}
-                      value={tpl.id}
-                      disabled={tpl.status !== undefined && tpl.status !== 'APPROVED'}
-                    >
-                      {tpl.category}: {tpl.name} ({tpl.language}) {tpl.status ? `[${tpl.status}]` : ''}
-                    </option>
-                  ))}
+                  <option value="">-- Choose {campaignChannel === 'EMAIL' ? 'Email' : 'Approved WhatsApp'} Template --</option>
+                  {templates
+                    .filter((tpl) => (campaignChannel === 'EMAIL' ? tpl.channel === 'EMAIL' : tpl.channel !== 'EMAIL'))
+                    .map((tpl) => (
+                      <option
+                        key={tpl.id}
+                        value={tpl.id}
+                        disabled={campaignChannel === 'WHATSAPP' && tpl.status !== undefined && tpl.status !== 'APPROVED'}
+                      >
+                        {tpl.category}: {tpl.name} ({tpl.language}) {tpl.status ? `[${tpl.status}]` : ''}
+                      </option>
+                    ))}
                 </select>
               )}
-              {activeTemplate && (
-                <p className="text-[10px] text-green-600 font-bold flex items-center gap-1 mt-1">
-                  <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                  Approved by Meta (Ready to Send)
-                </p>
+              {/* A/B Testing Section for Email Marketing */}
+              {campaignChannel === 'EMAIL' && (
+                <div className="p-4 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-indigo-900 flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isAbTest}
+                        onChange={(e) => setIsAbTest(e.target.checked)}
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>Enable A/B Subject & Content Testing</span>
+                    </label>
+                    <span className="text-[10px] uppercase font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
+                      50 / 50 Split
+                    </span>
+                  </div>
+
+                  {isAbTest && (
+                    <div className="space-y-3 pt-2 border-t border-indigo-100 text-xs">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                          Variant B Subject Line *
+                        </label>
+                        <input
+                          type="text"
+                          value={abSubjectB}
+                          onChange={(e) => setAbSubjectB(e.target.value)}
+                          placeholder="e.g. Quick reminder: save on your coverage today"
+                          className="w-full bg-white border border-indigo-200 rounded-lg px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                            Winner Metric
+                          </label>
+                          <select
+                            value={abMetric}
+                            onChange={(e: any) => setAbMetric(e.target.value)}
+                            className="w-full bg-white border border-indigo-200 rounded-lg px-3 py-1.5 text-xs font-semibold outline-none"
+                          >
+                            <option value="CLICKS">Highest Clicks (Recommended)</option>
+                            <option value="OPENS">Highest Opens (Approximate)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                            Test Split
+                          </label>
+                          <select
+                            value={abSplit}
+                            onChange={(e: any) => setAbSplit(Number(e.target.value))}
+                            className="w-full bg-white border border-indigo-200 rounded-lg px-3 py-1.5 text-xs font-semibold outline-none"
+                          >
+                            <option value="50">50% Variant A / 50% Variant B</option>
+                            <option value="40">40% Variant A / 60% Variant B</option>
+                            <option value="30">30% Variant A / 70% Variant B</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -535,6 +723,25 @@ export default function BroadcastCenterPage() {
                   />
                   <span className="text-xs font-semibold text-[#1c1b1f]">By Date Range</span>
                 </label>
+
+                {campaignChannel === 'EMAIL' && (
+                  <label
+                    className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer hover:bg-slate-50 transition-colors ${recipientType === 'email_engagement' ? 'border-[#004ac6] bg-[#004ac6]/5' : 'border-[#c3c6d7] bg-white'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="recipients"
+                      value="email_engagement"
+                      checked={recipientType === 'email_engagement'}
+                      onChange={() => {
+                        setRecipientType('email_engagement');
+                        setFilterValue('');
+                      }}
+                      className="text-[#004ac6] focus:ring-[#004ac6]"
+                    />
+                    <span className="text-xs font-semibold text-[#1c1b1f]">By Engagement / Activity</span>
+                  </label>
+                )}
               </div>
 
               {/* Recipient inputs fields */}
@@ -605,6 +812,24 @@ export default function BroadcastCenterPage() {
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {recipientType === 'email_engagement' && (
+                <div className="space-y-1 pt-1.5 animate-in fade-in duration-200">
+                  <label htmlFor="email-engagement-select" className="text-[9px] text-[#737686] font-bold block">
+                    Email Behavioral Activity
+                  </label>
+                  <select
+                    id="email-engagement-select"
+                    value={emailActivityFilter}
+                    onChange={(e: any) => setEmailActivityFilter(e.target.value)}
+                    className="w-full bg-slate-50 border border-[#c3c6d7] rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#004ac6] font-bold text-[#1c1b1f]"
+                  >
+                    <option value="OPENED_LAST_30_DAYS">Opened an email in last 30 days</option>
+                    <option value="CLICKED_ANY">Clicked any email link</option>
+                    <option value="NEVER_BOUNCED">Clean reputation (Never bounced)</option>
+                  </select>
                 </div>
               )}
 
@@ -864,13 +1089,15 @@ export default function BroadcastCenterPage() {
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-[#c3c6d7]">
                     <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider">Campaign Name</th>
+                    <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider">Channel</th>
                     <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider">Sent Date</th>
                     <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider">Recipients</th>
                     <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider text-center">Delivered</th>
-                    <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider text-center">Read</th>
-                    <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider text-center">Replied</th>
+                    <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider text-center">Read / Opened</th>
+                    <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider text-center">Replied / Clicked</th>
                     <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider text-center">Converted</th>
                     <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider">Cost</th>
+                    <th className="px-6 py-3 font-bold text-[#49454f] uppercase tracking-wider text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#c3c6d7]/60">
@@ -887,6 +1114,19 @@ export default function BroadcastCenterPage() {
                           <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
                             {camp.template?.name || 'Manual'} ({camp.status})
                           </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {camp.channel === 'EMAIL' ? (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 inline-flex items-center gap-1">
+                              <span className="material-symbols-outlined text-xs">mail</span>
+                              Email
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                              <span className="material-symbols-outlined text-xs">chat</span>
+                              WhatsApp
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 font-semibold text-[#49454f]">
                           {formatDateString(camp.createdAt)}
@@ -922,6 +1162,62 @@ export default function BroadcastCenterPage() {
                         </td>
                         <td className="px-6 py-4 font-bold text-slate-800">
                           ${camp.cost.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {camp.status === 'QUEUED' && (
+                              <button
+                                type="button"
+                                title="Pause Campaign"
+                                onClick={async () => {
+                                  await fetch(`/api/dashboard/broadcast/${camp.id}/status`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'PAUSE' }),
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+                                }}
+                                className="p-1 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs"
+                              >
+                                <span className="material-symbols-outlined text-sm">pause</span>
+                              </button>
+                            )}
+                            {camp.status === 'PAUSED' && (
+                              <button
+                                type="button"
+                                title="Resume Campaign"
+                                onClick={async () => {
+                                  await fetch(`/api/dashboard/broadcast/${camp.id}/status`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'RESUME' }),
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+                                }}
+                                className="p-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs"
+                              >
+                                <span className="material-symbols-outlined text-sm">play_arrow</span>
+                              </button>
+                            )}
+                            {['QUEUED', 'PAUSED'].includes(camp.status) && (
+                              <button
+                                type="button"
+                                title="Cancel Campaign"
+                                onClick={async () => {
+                                  if (!confirm('Cancel this running campaign?')) return;
+                                  await fetch(`/api/dashboard/broadcast/${camp.id}/status`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'CANCEL' }),
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+                                }}
+                                className="p-1 rounded bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs"
+                              >
+                                <span className="material-symbols-outlined text-sm">close</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

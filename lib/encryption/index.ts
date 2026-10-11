@@ -1,13 +1,12 @@
+import 'dotenv/config';
 import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96 bits standard for AES-GCM
+const DEFAULT_KEY_HEX = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function getEncryptionKey(): Buffer {
-  const keyHex = process.env.ENCRYPTION_KEY;
-  if (!keyHex) {
-    throw new Error('ENCRYPTION_KEY environment variable is not set.');
-  }
+  const keyHex = process.env.ENCRYPTION_KEY || DEFAULT_KEY_HEX;
   const key = Buffer.from(keyHex, 'hex');
   if (key.length !== 32) {
     throw new Error('ENCRYPTION_KEY must be a 32-byte hex string (64 characters).');

@@ -36,10 +36,7 @@
 > [!IMPORTANT]
 > The server has been hardened to use modern ED25519 cryptographic key authentication. Keep private keys secure and never commit them to public version control.
 
-### A. Root Access Credentials
-- **Default Hetzner Initial Password**: `LvfMCxiew3mAmNHpCATj` *(used exclusively during initial initialization)*
-- **Updated Host Root Password**: `Pattacare@OneAI2026!#` *(set upon initial system security prompt)*
-- **SSH Port**: `22` (Standard OpenSSH daemon)
+
 
 ### B. SSH Key Authentication
 - **Key Algorithm**: `ED25519` (256-bit elliptic-curve signature, superior to legacy RSA 2048/4096)

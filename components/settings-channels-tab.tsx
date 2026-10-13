@@ -33,6 +33,14 @@ function InstagramIcon({ className = "w-5 h-5" }: { className?: string }) {
   );
 }
 
+function FacebookIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+    </svg>
+  );
+}
+
 type ConnectMethod = 'QR' | 'PHONE';
 type EngineType = 'BAILEYS' | 'OPENWA';
 
@@ -71,6 +79,14 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
   const [igSaveSuccess, setIgSaveSuccess] = useState(false);
   const [igError, setIgError] = useState('');
   const [igTestFeedback, setIgTestFeedback] = useState<{ valid: boolean; account?: any; error?: string } | null>(null);
+
+  // Facebook Channel States
+  const [fbPageId, setFbPageId] = useState('');
+  const [fbPageName, setFbPageName] = useState('');
+  const [fbAccessToken, setFbAccessToken] = useState('');
+  const [fbSaveSuccess, setFbSaveSuccess] = useState(false);
+  const [fbError, setFbError] = useState('');
+  const [fbTestFeedback, setFbTestFeedback] = useState<{ valid: boolean; page?: any; error?: string } | null>(null);
 
   // Email Channel States
   const [emailProvider, setEmailProvider] = useState<'RESEND' | 'SES' | 'SENDGRID' | 'SMTP'>('RESEND');
@@ -386,6 +402,89 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
       setIgPageId('');
       setIgAccessToken('');
       queryClient.invalidateQueries({ queryKey: ['instagramStatus', tenantId] });
+    },
+  });
+
+  // Facebook Queries & Mutations
+  const { data: fbStatus, refetch: refetchFbStatus } = useQuery<{
+    connected: boolean;
+    pageId?: string;
+    pageName?: string;
+    status: string;
+    inheritedFromInstagram?: boolean;
+  }>({
+    queryKey: ['facebookStatus', tenantId],
+    queryFn: async () => {
+      const res = await fetch('/api/channels/facebook');
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  useEffect(() => {
+    if (fbStatus?.connected) {
+      if (fbStatus.pageId) setFbPageId(fbStatus.pageId);
+      if (fbStatus.pageName) setFbPageName(fbStatus.pageName);
+    }
+  }, [fbStatus]);
+
+  const saveFbMutation = useMutation({
+    mutationFn: async () => {
+      setFbError('');
+      const res = await fetch('/api/channels/facebook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageId: fbPageId,
+          pageName: fbPageName,
+          pageAccessToken: fbAccessToken,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save Facebook credentials');
+      return data;
+    },
+    onSuccess: () => {
+      setFbSaveSuccess(true);
+      refetchFbStatus();
+      queryClient.invalidateQueries({ queryKey: ['facebookStatus', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-integrations'] });
+      setTimeout(() => setFbSaveSuccess(false), 4000);
+    },
+    onError: (err: any) => {
+      setFbError(err.message || 'Error saving Facebook credentials');
+    },
+  });
+
+  const testFbMutation = useMutation({
+    mutationFn: async () => {
+      setFbTestFeedback(null);
+      setFbError('');
+      const res = await fetch('/api/channels/facebook/verify');
+      const data = await res.json();
+      return data;
+    },
+    onSuccess: (data) => {
+      setFbTestFeedback(data);
+    },
+    onError: (err: any) => {
+      setFbTestFeedback({ valid: false, error: err.message || 'Verification failed' });
+    },
+  });
+
+  const disconnectFbMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/channels/facebook', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to disconnect Facebook');
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchFbStatus();
+      setFbPageId('');
+      setFbPageName('');
+      setFbAccessToken('');
+      queryClient.invalidateQueries({ queryKey: ['facebookStatus', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-integrations'] });
     },
   });
 
@@ -973,6 +1072,166 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
               className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-sm transition disabled:opacity-50"
             >
               {saveIgMutation.isPending ? 'Connecting...' : 'Save & Connect Instagram'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Facebook Page Integration Card */}
+      <div className="bg-white border border-[#c3c6d7] rounded-2xl p-6 shadow-sm space-y-6">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1877F2]">
+              <FacebookIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-base font-bold text-[#1c1b1f]">Facebook Page Integration</h4>
+                {fbStatus?.connected ? (
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Connected {fbStatus.pageName ? `(${fbStatus.pageName})` : ''}
+                    {fbStatus.inheritedFromInstagram && ' • Via Instagram'}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                    Not Connected
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#49454f] mt-0.5">
+                Publish feed posts, healthcare announcements, photos, and video campaigns directly to your official Facebook Page.
+              </p>
+            </div>
+          </div>
+          {fbStatus?.connected && !fbStatus.inheritedFromInstagram && (
+            <button
+              type="button"
+              onClick={() => disconnectFbMutation.mutate()}
+              disabled={disconnectFbMutation.isPending}
+              className="text-xs font-bold text-rose-600 hover:text-rose-700 border border-rose-200 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition"
+            >
+              {disconnectFbMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
+            </button>
+          )}
+        </div>
+
+        {/* Credentials Form */}
+        <div className="space-y-4 pt-2 border-t border-gray-100">
+          {igPageId && !fbPageId && (
+            <div className="flex items-center justify-between p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900">
+              <span>Detected Facebook Page ID linked to your Instagram: <strong>{igPageId}</strong></span>
+              <button
+                type="button"
+                onClick={() => {
+                  setFbPageId(igPageId);
+                  if (igAccessToken) setFbAccessToken(igAccessToken);
+                  if (igUsername) setFbPageName(`${igUsername} Page`);
+                }}
+                className="px-3 py-1 bg-white hover:bg-blue-50 border border-blue-300 font-bold text-[11px] rounded-lg transition"
+              >
+                Auto-Fill from Instagram
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Facebook Page ID <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={fbPageId}
+                onChange={(e) => setFbPageId(e.target.value)}
+                placeholder="e.g. 102938475610293"
+                className="w-full px-3 py-2 bg-slate-50 border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6] focus:bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Facebook Page Name / Brand
+              </label>
+              <input
+                type="text"
+                value={fbPageName}
+                onChange={(e) => setFbPageName(e.target.value)}
+                placeholder="e.g. Prime Health Experts Official"
+                className="w-full px-3 py-2 bg-slate-50 border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6] focus:bg-white"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Page Access Token (Encrypted AES-256) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="password"
+                value={fbAccessToken}
+                onChange={(e) => setFbAccessToken(e.target.value)}
+                placeholder={fbStatus?.connected ? "••••••••••••••••••••••••" : "EAAB..."}
+                className="w-full px-3 py-2 bg-slate-50 border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6] focus:bg-white"
+              />
+            </div>
+          </div>
+
+          <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 text-[11px] text-blue-900 space-y-1">
+            <p className="font-bold flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-700" />
+              Meta App Scopes & Token Requirements:
+            </p>
+            <p>
+              Requires <strong>pages_manage_posts</strong> and <strong>pages_read_engagement</strong> permissions. Generate a permanent Page Access Token from Meta Business Suite / Graph API Explorer for automated campaign distribution.
+            </p>
+          </div>
+
+          {fbError && <p className="text-xs text-rose-600 font-semibold">{fbError}</p>}
+          {fbSaveSuccess && (
+            <p className="text-xs text-emerald-700 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 font-bold">
+              ✓ Facebook Page credentials securely saved and encrypted! Publishing pipeline is active.
+            </p>
+          )}
+
+          {/* Meta Graph API Test Feedback */}
+          {fbTestFeedback && (
+            <div className={`p-3 rounded-xl border text-xs font-semibold ${
+              fbTestFeedback.valid
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`}>
+              {fbTestFeedback.valid ? (
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    Meta Connection Verified! Page: <strong>{fbTestFeedback.page?.name}</strong> (Category: {fbTestFeedback.page?.category || 'General'}) • Followers: {fbTestFeedback.page?.fanCount ?? 'Active'} • Ready for Publishing
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>Meta API Error: {fbTestFeedback.error}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => testFbMutation.mutate()}
+              disabled={testFbMutation.isPending || (!fbStatus?.connected && !fbPageId)}
+              className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${testFbMutation.isPending ? 'animate-spin' : ''}`} />
+              {testFbMutation.isPending ? 'Verifying with Meta...' : 'Test Meta Connection'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => saveFbMutation.mutate()}
+              disabled={saveFbMutation.isPending || !fbPageId || (!fbAccessToken && !fbStatus?.connected)}
+              className="px-5 py-2.5 bg-[#1877F2] hover:bg-[#166fe5] text-white font-bold text-xs rounded-xl shadow-sm transition disabled:opacity-50"
+            >
+              {saveFbMutation.isPending ? 'Connecting...' : 'Save & Connect Facebook'}
             </button>
           </div>
         </div>

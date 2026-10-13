@@ -442,6 +442,18 @@ function DigitalMarketingSuitePageInner() {
                               <span>Instagram ↗</span>
                             </a>
                           )}
+                          {item.auditDetails?.facebookPermalink && (
+                            <a
+                              href={item.auditDetails.facebookPermalink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded text-[10px] font-bold transition flex items-center gap-1 shadow-sm"
+                              title="View Live on Facebook"
+                            >
+                              <FacebookIcon className="w-3.5 h-3.5 text-[#1877F2]" />
+                              <span>Facebook ↗</span>
+                            </a>
+                          )}
                           <a
                             href={`/dashboard/marketing`}
                             className="p-1.5 text-gray-500 hover:text-[#004ac6] transition"

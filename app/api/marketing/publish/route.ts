@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getTenantContext } from '@/lib/tenant';
 import { getTenantPrisma } from '@/lib/db';
 import { InstagramPublisher } from '@/lib/social/instagramPublisher';
+import { FacebookPublisher } from '@/lib/social/facebookPublisher';
 
 async function resolveTenant(request: Request) {
   try {
@@ -102,7 +103,28 @@ export async function POST(request: Request) {
       // 2. FACEBOOK PAGE FEED API (Placeholder for Pillar 2 Step 2)
       // =======================================================================
       if (targetPlatforms.includes('facebook')) {
-        publishResults.facebook = { success: true, simulated: true };
+        try {
+          const fbResult = await FacebookPublisher.publishPost(tenantCtx.tenantId, {
+            message: campaign.caption,
+            mediaUrl: campaign.mediaUrl || undefined,
+            title: campaign.name,
+          });
+
+          publishResults.facebook = {
+            success: true,
+            postId: fbResult.postId,
+            permalink: fbResult.permalink,
+          };
+        } catch (fbErr: any) {
+          console.error('[Publish Route] Facebook Publish Error:', fbErr);
+          if (targetPlatforms.length === 1) {
+            throw new Error(`Facebook publishing failed: ${fbErr.message}`);
+          }
+          publishResults.facebook = {
+            success: false,
+            error: fbErr.message,
+          };
+        }
       }
 
       // =======================================================================
@@ -124,6 +146,7 @@ export async function POST(request: Request) {
             ...existingAudit,
             publishResults,
             instagramPermalink: publishResults.instagram?.permalink,
+            facebookPermalink: publishResults.facebook?.permalink,
           },
         },
       });

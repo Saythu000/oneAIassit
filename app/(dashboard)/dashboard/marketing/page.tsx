@@ -82,6 +82,7 @@ function DigitalMarketingSuitePageInner() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['facebook', 'instagram']);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaFileName, setMediaFileName] = useState<string | null>(null);
+  const [instagramFormat, setInstagramFormat] = useState<'REELS' | 'STORIES' | 'FEED'>('REELS');
   const [caption, setCaption] = useState('');
   const [isOptimizing, setIsOptimizing] = useState(false);
 
@@ -152,11 +153,11 @@ function DigitalMarketingSuitePageInner() {
 
   // 4. Publish / Retry Mutation
   const publishMutation = useMutation({
-    mutationFn: async ({ campaignId, action = 'publish' }: { campaignId: string; action?: string }) => {
+    mutationFn: async ({ campaignId, action = 'publish', format }: { campaignId: string; action?: string; format?: string }) => {
       const res = await fetch('/api/marketing/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignId, action }),
+        body: JSON.stringify({ campaignId, action, format: format || instagramFormat }),
       });
       if (!res.ok) {
         const errJson = await res.json();
@@ -262,7 +263,10 @@ function DigitalMarketingSuitePageInner() {
         status: status === 'PENDING' ? 'PENDING' : status,
         scheduledAt: status === 'SCHEDULED' && scheduleDateTime ? scheduleDateTime : null,
         budget: campaignType === 'PAID' ? parseFloat(budget) || null : null,
-        audienceTargeting: campaignType === 'PAID' ? { ageRange, location, interests: interestTags } : null,
+        audienceTargeting: {
+          ...(campaignType === 'PAID' ? { ageRange, location, interests: interestTags } : {}),
+          instagramFormat,
+        },
         complianceScore: auditData?.complianceScore || null,
         ctrPrediction: auditData?.ctrPrediction || null,
         auditResult: auditData?.auditResult || null,
@@ -281,7 +285,7 @@ function DigitalMarketingSuitePageInner() {
       const createdCampaignId = data.campaign.id;
 
       if (status === 'PENDING' && createdCampaignId) {
-        await publishMutation.mutateAsync({ campaignId: createdCampaignId });
+        await publishMutation.mutateAsync({ campaignId: createdCampaignId, format: instagramFormat });
       }
 
       queryClient.invalidateQueries({ queryKey: ['marketing-campaigns'] });
@@ -425,6 +429,18 @@ function DigitalMarketingSuitePageInner() {
                               <RotateCw className="w-3 h-3" />
                               Retry
                             </button>
+                          )}
+                          {item.auditDetails?.instagramPermalink && (
+                            <a
+                              href={item.auditDetails.instagramPermalink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 bg-pink-50 border border-pink-200 text-pink-700 hover:bg-pink-100 rounded text-[10px] font-bold transition flex items-center gap-1 shadow-sm"
+                              title="View Live on Instagram"
+                            >
+                              <InstagramIcon className="w-3.5 h-3.5 text-pink-600" />
+                              <span>Instagram ↗</span>
+                            </a>
                           )}
                           <a
                             href={`/dashboard/marketing`}
@@ -864,6 +880,43 @@ function DigitalMarketingSuitePageInner() {
                     })}
                   </div>
                 </div>
+
+                {/* Instagram Format Selector (Reels vs Stories vs Feed) */}
+                {selectedPlatforms.includes('instagram') && (
+                  <div className="p-4 bg-pink-50/50 border border-pink-200/80 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <InstagramIcon className="w-4 h-4 text-pink-600" />
+                        <span className="text-xs font-bold text-pink-950">Instagram Content Format</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-pink-700 bg-pink-100/80 px-2 py-0.5 rounded-full">
+                        Meta Graph API v21.0
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {[
+                        { id: 'REELS' as const, label: '🎬 Instagram Reel', desc: 'Vertical 9:16 video (5s-15min)' },
+                        { id: 'STORIES' as const, label: '📱 Instagram Story', desc: 'Vertical 9:16 photo/video (24h)' },
+                        { id: 'FEED' as const, label: '🖼️ Feed Post', desc: 'Standard square or 4:5 image/video' },
+                      ].map((fmt) => (
+                        <button
+                          key={fmt.id}
+                          type="button"
+                          onClick={() => setInstagramFormat(fmt.id)}
+                          className={`p-3 rounded-lg border text-left transition ${
+                            instagramFormat === fmt.id
+                              ? 'border-pink-600 bg-white ring-2 ring-pink-500/20 shadow-sm'
+                              : 'border-pink-200 bg-white/70 hover:bg-white text-gray-700'
+                          }`}
+                        >
+                          <p className="text-xs font-bold text-gray-900">{fmt.label}</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">{fmt.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Upload File */}
                 <div>

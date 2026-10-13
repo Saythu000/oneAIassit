@@ -70,6 +70,7 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
   const [igAccessToken, setIgAccessToken] = useState('');
   const [igSaveSuccess, setIgSaveSuccess] = useState(false);
   const [igError, setIgError] = useState('');
+  const [igTestFeedback, setIgTestFeedback] = useState<{ valid: boolean; account?: any; error?: string } | null>(null);
 
   // Email Channel States
   const [emailProvider, setEmailProvider] = useState<'RESEND' | 'SES' | 'SENDGRID' | 'SMTP'>('RESEND');
@@ -353,6 +354,22 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
     },
     onError: (err: any) => {
       setIgError(err.message || 'Error saving Instagram credentials');
+    },
+  });
+
+  const testIgMutation = useMutation({
+    mutationFn: async () => {
+      setIgTestFeedback(null);
+      setIgError('');
+      const res = await fetch('/api/channels/instagram/verify');
+      const data = await res.json();
+      return data;
+    },
+    onSuccess: (data) => {
+      setIgTestFeedback(data);
+    },
+    onError: (err: any) => {
+      setIgTestFeedback({ valid: false, error: err.message || 'Verification failed' });
     },
   });
 
@@ -911,11 +928,44 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
           {igError && <p className="text-xs text-rose-600 font-semibold">{igError}</p>}
           {igSaveSuccess && (
             <p className="text-xs text-emerald-700 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 font-bold">
-              ✓ Instagram credentials securely saved and encrypted! Inbound DMs are now active.
+              ✓ Instagram credentials securely saved and encrypted! Inbound DMs and Publishing are active.
             </p>
           )}
 
-          <div className="flex justify-end pt-2">
+          {/* Meta Graph API Test Feedback */}
+          {igTestFeedback && (
+            <div className={`p-3 rounded-xl border text-xs font-semibold ${
+              igTestFeedback.valid
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`}>
+              {igTestFeedback.valid ? (
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    Meta Connection Verified! Account: <strong>@{igTestFeedback.account?.username}</strong> ({igTestFeedback.account?.name || 'Verified'}) • Permissions Active for Reels & Publishing
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>Meta API Error: {igTestFeedback.error}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => testIgMutation.mutate()}
+              disabled={testIgMutation.isPending || (!igStatus?.connected && !igId)}
+              className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${testIgMutation.isPending ? 'animate-spin' : ''}`} />
+              {testIgMutation.isPending ? 'Verifying with Meta...' : 'Test Meta Connection'}
+            </button>
+
             <button
               type="button"
               onClick={() => saveIgMutation.mutate()}

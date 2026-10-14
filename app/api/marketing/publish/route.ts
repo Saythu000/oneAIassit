@@ -3,6 +3,7 @@ import { getTenantContext } from '@/lib/tenant';
 import { getTenantPrisma } from '@/lib/db';
 import { InstagramPublisher } from '@/lib/social/instagramPublisher';
 import { FacebookPublisher } from '@/lib/social/facebookPublisher';
+import { LinkedinPublisher } from '@/lib/social/linkedinPublisher';
 
 async function resolveTenant(request: Request) {
   try {
@@ -131,7 +132,28 @@ export async function POST(request: Request) {
       // 3. LINKEDIN SHARES API (Placeholder for Pillar 2 Step 3)
       // =======================================================================
       if (targetPlatforms.includes('linkedin')) {
-        publishResults.linkedin = { success: true, simulated: true };
+        try {
+          const liResult = await LinkedinPublisher.publishPost(tenantCtx.tenantId, {
+            text: campaign.caption,
+            mediaUrl: campaign.mediaUrl || undefined,
+            title: campaign.name,
+          });
+
+          publishResults.linkedin = {
+            success: true,
+            postId: liResult.postId,
+            permalink: liResult.permalink,
+          };
+        } catch (liErr: any) {
+          console.error('[Publish Route] LinkedIn Publish Error:', liErr);
+          if (targetPlatforms.length === 1) {
+            throw new Error(`LinkedIn publishing failed: ${liErr.message}`);
+          }
+          publishResults.linkedin = {
+            success: false,
+            error: liErr.message,
+          };
+        }
       }
 
       // 3. Transition PUBLISHING -> SUCCESS
@@ -147,6 +169,7 @@ export async function POST(request: Request) {
             publishResults,
             instagramPermalink: publishResults.instagram?.permalink,
             facebookPermalink: publishResults.facebook?.permalink,
+            linkedinPermalink: publishResults.linkedin?.permalink,
           },
         },
       });

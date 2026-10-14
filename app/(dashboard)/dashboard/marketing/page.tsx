@@ -454,6 +454,18 @@ function DigitalMarketingSuitePageInner() {
                               <span>Facebook ↗</span>
                             </a>
                           )}
+                          {item.auditDetails?.linkedinPermalink && (
+                            <a
+                              href={item.auditDetails.linkedinPermalink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 bg-sky-50 border border-sky-200 text-sky-800 hover:bg-sky-100 rounded text-[10px] font-bold transition flex items-center gap-1 shadow-sm"
+                              title="View Live on LinkedIn"
+                            >
+                              <LinkedinIcon className="w-3.5 h-3.5 text-[#0A66C2]" />
+                              <span>LinkedIn ↗</span>
+                            </a>
+                          )}
                           <a
                             href={`/dashboard/marketing`}
                             className="p-1.5 text-gray-500 hover:text-[#004ac6] transition"

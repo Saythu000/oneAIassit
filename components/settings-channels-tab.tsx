@@ -41,6 +41,14 @@ function FacebookIcon({ className = "w-5 h-5" }: { className?: string }) {
   );
 }
 
+function LinkedinIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+    </svg>
+  );
+}
+
 type ConnectMethod = 'QR' | 'PHONE';
 type EngineType = 'BAILEYS' | 'OPENWA';
 
@@ -87,6 +95,15 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
   const [fbSaveSuccess, setFbSaveSuccess] = useState(false);
   const [fbError, setFbError] = useState('');
   const [fbTestFeedback, setFbTestFeedback] = useState<{ valid: boolean; page?: any; error?: string } | null>(null);
+
+  // LinkedIn Channel States
+  const [liAuthorUrn, setLiAuthorUrn] = useState('');
+  const [liAccountName, setLiAccountName] = useState('');
+  const [liAccessToken, setLiAccessToken] = useState('');
+  const [liAuthorType, setLiAuthorType] = useState<'ORGANIZATION' | 'PERSON'>('ORGANIZATION');
+  const [liSaveSuccess, setLiSaveSuccess] = useState(false);
+  const [liError, setLiError] = useState('');
+  const [liTestFeedback, setLiTestFeedback] = useState<{ valid: boolean; profile?: any; error?: string } | null>(null);
 
   // Email Channel States
   const [emailProvider, setEmailProvider] = useState<'RESEND' | 'SES' | 'SENDGRID' | 'SMTP'>('RESEND');
@@ -484,6 +501,91 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
       setFbPageName('');
       setFbAccessToken('');
       queryClient.invalidateQueries({ queryKey: ['facebookStatus', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-integrations'] });
+    },
+  });
+
+  // LinkedIn Queries & Mutations
+  const { data: liStatus, refetch: refetchLiStatus } = useQuery<{
+    connected: boolean;
+    authorUrn?: string;
+    accountName?: string;
+    authorType?: 'ORGANIZATION' | 'PERSON';
+    status: string;
+  }>({
+    queryKey: ['linkedinStatus', tenantId],
+    queryFn: async () => {
+      const res = await fetch('/api/channels/linkedin');
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  useEffect(() => {
+    if (liStatus?.connected) {
+      if (liStatus.authorUrn) setLiAuthorUrn(liStatus.authorUrn);
+      if (liStatus.accountName) setLiAccountName(liStatus.accountName);
+      if (liStatus.authorType) setLiAuthorType(liStatus.authorType);
+    }
+  }, [liStatus]);
+
+  const saveLiMutation = useMutation({
+    mutationFn: async () => {
+      setLiError('');
+      const res = await fetch('/api/channels/linkedin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authorUrn: liAuthorUrn,
+          accountName: liAccountName,
+          accessToken: liAccessToken,
+          authorType: liAuthorType,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save LinkedIn credentials');
+      return data;
+    },
+    onSuccess: () => {
+      setLiSaveSuccess(true);
+      refetchLiStatus();
+      queryClient.invalidateQueries({ queryKey: ['linkedinStatus', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['marketing-integrations'] });
+      setTimeout(() => setLiSaveSuccess(false), 4000);
+    },
+    onError: (err: any) => {
+      setLiError(err.message || 'Error saving LinkedIn credentials');
+    },
+  });
+
+  const testLiMutation = useMutation({
+    mutationFn: async () => {
+      setLiTestFeedback(null);
+      setLiError('');
+      const res = await fetch('/api/channels/linkedin/verify');
+      const data = await res.json();
+      return data;
+    },
+    onSuccess: (data) => {
+      setLiTestFeedback(data);
+    },
+    onError: (err: any) => {
+      setLiTestFeedback({ valid: false, error: err.message || 'Verification failed' });
+    },
+  });
+
+  const disconnectLiMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/channels/linkedin', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to disconnect LinkedIn');
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchLiStatus();
+      setLiAuthorUrn('');
+      setLiAccountName('');
+      setLiAccessToken('');
+      queryClient.invalidateQueries({ queryKey: ['linkedinStatus', tenantId] });
       queryClient.invalidateQueries({ queryKey: ['marketing-integrations'] });
     },
   });
@@ -1232,6 +1334,176 @@ export default function SettingsChannelsTab({ tenantId }: SettingsChannelsTabPro
               className="px-5 py-2.5 bg-[#1877F2] hover:bg-[#166fe5] text-white font-bold text-xs rounded-xl shadow-sm transition disabled:opacity-50"
             >
               {saveFbMutation.isPending ? 'Connecting...' : 'Save & Connect Facebook'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* LinkedIn Company / Member Integration Card */}
+      <div className="bg-white border border-[#c3c6d7] rounded-2xl p-6 shadow-sm space-y-6">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#0A66C2]">
+              <LinkedinIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-base font-bold text-[#1c1b1f]">LinkedIn Company & Profile Integration</h4>
+                {liStatus?.connected ? (
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Connected {liStatus.accountName ? `(${liStatus.accountName})` : ''}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                    Not Connected
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#49454f] mt-0.5">
+                Publish thought leadership posts, promotional announcements, and media updates directly to your LinkedIn Company Page or Personal Profile.
+              </p>
+            </div>
+          </div>
+          {liStatus?.connected && (
+            <button
+              type="button"
+              onClick={() => disconnectLiMutation.mutate()}
+              disabled={disconnectLiMutation.isPending}
+              className="text-xs font-bold text-rose-600 hover:text-rose-700 border border-rose-200 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition"
+            >
+              {disconnectLiMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
+            </button>
+          )}
+        </div>
+
+        {/* Credentials Form */}
+        <div className="space-y-4 pt-2 border-t border-gray-100">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Posting As (Author Type)</label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-800 cursor-pointer">
+                <input
+                  type="radio"
+                  name="liAuthorType"
+                  value="ORGANIZATION"
+                  checked={liAuthorType === 'ORGANIZATION'}
+                  onChange={() => setLiAuthorType('ORGANIZATION')}
+                  className="text-[#0A66C2] focus:ring-[#0A66C2]"
+                />
+                Company / Organization Page
+              </label>
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-800 cursor-pointer">
+                <input
+                  type="radio"
+                  name="liAuthorType"
+                  value="PERSON"
+                  checked={liAuthorType === 'PERSON'}
+                  onChange={() => setLiAuthorType('PERSON')}
+                  className="text-[#0A66C2] focus:ring-[#0A66C2]"
+                />
+                Personal Profile / Member
+              </label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                {liAuthorType === 'ORGANIZATION' ? 'LinkedIn Organization ID or URN' : 'LinkedIn Member URN / ID'} <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={liAuthorUrn}
+                onChange={(e) => setLiAuthorUrn(e.target.value)}
+                placeholder={liAuthorType === 'ORGANIZATION' ? 'e.g. 98765432 or urn:li:organization:98765432' : 'e.g. urn:li:person:abcdef123'}
+                className="w-full px-3 py-2 bg-slate-50 border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6] focus:bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Display / Company Name
+              </label>
+              <input
+                type="text"
+                value={liAccountName}
+                onChange={(e) => setLiAccountName(e.target.value)}
+                placeholder="e.g. Prime Marketing Experts Company"
+                className="w-full px-3 py-2 bg-slate-50 border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6] focus:bg-white"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                OAuth 2.0 Access Token (Encrypted AES-256) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="password"
+                value={liAccessToken}
+                onChange={(e) => setLiAccessToken(e.target.value)}
+                placeholder={liStatus?.connected ? "••••••••••••••••••••••••" : "AQV..."}
+                className="w-full px-3 py-2 bg-slate-50 border border-gray-300 rounded-lg text-xs outline-none focus:border-[#004ac6] focus:bg-white"
+              />
+            </div>
+          </div>
+
+          <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 text-[11px] text-blue-900 space-y-1">
+            <p className="font-bold flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-700" />
+              Required LinkedIn OAuth 2.0 Scopes:
+            </p>
+            <p>
+              For Organization Pages: <strong>w_organization_social</strong> and <strong>r_organization_social</strong>. For Personal Profiles: <strong>w_member_social</strong> and <strong>openid, profile, email</strong>.
+            </p>
+          </div>
+
+          {liError && <p className="text-xs text-rose-600 font-semibold">{liError}</p>}
+          {liSaveSuccess && (
+            <p className="text-xs text-emerald-700 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 font-bold">
+              ✓ LinkedIn credentials securely saved and encrypted! UGC Publishing pipeline is active.
+            </p>
+          )}
+
+          {/* LinkedIn API Test Feedback */}
+          {liTestFeedback && (
+            <div className={`p-3 rounded-xl border text-xs font-semibold ${
+              liTestFeedback.valid
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`}>
+              {liTestFeedback.valid ? (
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    LinkedIn Connection Verified! Name: <strong>{liTestFeedback.profile?.name}</strong> {liTestFeedback.profile?.email ? `(${liTestFeedback.profile.email})` : ''} • Ready for Campaign Publishing
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>LinkedIn API Error: {liTestFeedback.error}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => testLiMutation.mutate()}
+              disabled={testLiMutation.isPending || (!liStatus?.connected && !liAuthorUrn)}
+              className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${testLiMutation.isPending ? 'animate-spin' : ''}`} />
+              {testLiMutation.isPending ? 'Verifying with LinkedIn...' : 'Test LinkedIn Connection'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => saveLiMutation.mutate()}
+              disabled={saveLiMutation.isPending || !liAuthorUrn || (!liAccessToken && !liStatus?.connected)}
+              className="px-5 py-2.5 bg-[#0A66C2] hover:bg-[#084e96] text-white font-bold text-xs rounded-xl shadow-sm transition disabled:opacity-50"
+            >
+              {saveLiMutation.isPending ? 'Connecting...' : 'Save & Connect LinkedIn'}
             </button>
           </div>
         </div>

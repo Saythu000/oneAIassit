@@ -386,14 +386,14 @@ export default function BroadcastCenterPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#f9f9ff] relative overflow-y-auto">
+    <div className="flex-1 flex flex-col min-w-0 bg-slate-50/60 relative overflow-y-auto">
       {/* Alert Notification */}
       {notification && (
         <div
           className={`fixed top-4 right-6 px-5 py-3 rounded-2xl shadow-xl z-50 flex items-center gap-2 border font-bold text-xs ${
             notification.type === 'success'
-              ? 'bg-emerald-50 border-emerald-250 text-emerald-800'
-              : 'bg-rose-50 border-rose-250 text-rose-800'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
           }`}
         >
           <span className="material-symbols-outlined text-[18px]">
@@ -403,15 +403,20 @@ export default function BroadcastCenterPage() {
         </div>
       )}
 
-      {/* Main Header - matching EXACT layout */}
-      <header className="sticky top-0 z-20 bg-white border-b border-[#c3c6d7] h-16 flex items-center justify-between px-8 shrink-0 shadow-sm">
-        <h2 className="text-[18px] font-bold tracking-tight text-[#1c1b1f]">
-          New Broadcast
-        </h2>
+      {/* Main Header */}
+      <header className="sticky top-0 z-20 bg-white border-b border-slate-200/80 h-16 flex items-center justify-between px-8 shrink-0 shadow-xs">
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-slate-900">
+            Omnichannel Broadcast Center
+          </h2>
+          <p className="text-[11px] text-slate-500 font-medium">
+            Deploy bulk WhatsApp messages and automated email campaigns to qualified lead cohorts.
+          </p>
+        </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => showNotification('success', 'Campaign saved as Draft')}
-            className="px-4 py-2 rounded-xl border border-[#c3c6d7] hover:bg-slate-50 text-xs font-bold text-[#49454f] transition-all"
+            className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-600 transition-all shadow-xs"
           >
             Save as Draft
           </button>
@@ -419,22 +424,22 @@ export default function BroadcastCenterPage() {
             type="button"
             onClick={handleSendCampaignSubmit}
             disabled={sendCampaignMutation.isPending}
-            className="px-5 py-2 rounded-xl bg-[#004ac6] hover:bg-[#003ca0] text-white font-bold text-xs shadow-md shadow-[#004ac6]/10 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            className="px-5 py-2 rounded-xl bg-[#1B4B91] hover:bg-[#163e78] text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">send</span>
-            {sendCampaignMutation.isPending ? 'Sending...' : 'Schedule/Send'}
+            {sendCampaignMutation.isPending ? 'Sending...' : 'Schedule / Send Broadcast'}
           </button>
         </div>
       </header>
 
-      {/* Main Body - Centered card grid max-width 1000px */}
-      <main className="flex-1 p-8 max-w-[1050px] w-full mx-auto space-y-10">
+      {/* Main Body */}
+      <main className="flex-1 p-8 max-w-[1100px] w-full mx-auto space-y-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Column: Form Controls (7 cols) */}
-          <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-[#c3c6d7] shadow-sm space-y-6">
+          <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
             {/* Campaign Name */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-[#49454f] uppercase tracking-wide">
+              <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">
                 Campaign Name
               </label>
               <input
@@ -442,7 +447,7 @@ export default function BroadcastCenterPage() {
                 placeholder="e.g. Policy Renewal Reminder Oct-23"
                 value={campaignName}
                 onChange={(e) => setCampaignName(e.target.value)}
-                className="w-full bg-white border border-[#c3c6d7] rounded-xl px-4 py-2.5 text-xs text-[#1c1b1f] focus:outline-none focus:border-[#004ac6] focus:ring-2 focus:ring-[#004ac6]/10 transition-all font-semibold"
+                className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#1B4B91] focus:bg-white focus:ring-2 focus:ring-[#1B4B91]/10 transition-all font-semibold"
               />
             </div>
 

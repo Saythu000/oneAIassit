@@ -29,10 +29,12 @@ export async function GET(request: Request) {
 
     // Decode state
     let tenantId = 'tenant_pme_ff9xl';
+    let target = '';
     if (state) {
       try {
         const decoded = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
         if (decoded.tenantId) tenantId = decoded.tenantId;
+        if (decoded.target) target = decoded.target;
       } catch (e) {
         console.warn('[Facebook Callback] State decode fallback:', e);
       }
@@ -162,34 +164,68 @@ export async function GET(request: Request) {
             status: 'CONNECTED',
           },
         });
+
+        // Also sync platformConnection for INSTAGRAM
+        await (db as any).platformConnection.upsert({
+          where: {
+            tenantId_platform: { tenantId, platform: 'INSTAGRAM' },
+          },
+          update: {
+            status: 'CONNECTED',
+            accountName: `@${igUsername}`,
+            accessToken: encryptedToken,
+            connectedAt: new Date(),
+          },
+          create: {
+            tenantId,
+            platform: 'INSTAGRAM',
+            status: 'CONNECTED',
+            accountName: `@${igUsername}`,
+            accessToken: encryptedToken,
+            connectedAt: new Date(),
+          },
+        });
+
         connectedInstagram = true;
       } catch (igSyncErr) {
         console.warn('[Facebook Callback] Instagram auto-link skipped:', igSyncErr);
       }
     }
 
+    const isInstagramTarget = target === 'instagram';
+    const titleText = isInstagramTarget
+      ? (connectedInstagram ? 'Instagram & Facebook Connected!' : 'Facebook Connected (Instagram Pending)')
+      : 'Facebook Page Connected!';
+
     // 6. Return friendly success page with postMessage to update parent window
     return new NextResponse(
       `<!DOCTYPE html>
       <html>
         <head>
-          <title>Facebook Connected Successfully</title>
+          <title>${titleText}</title>
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f0fdf4; }
-            .card { background: white; padding: 32px; border-radius: 16px; border: 1px solid #bbf7d0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); text-align: center; max-width: 420px; }
-            h2 { color: #166534; margin: 0 0 8px; font-size: 20px; }
-            p { color: #15803d; margin: 0 0 16px; font-size: 14px; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: ${connectedInstagram && isInstagramTarget ? '#fdf4ff' : '#f0fdf4'}; }
+            .card { background: white; padding: 32px; border-radius: 16px; border: 1px solid ${connectedInstagram && isInstagramTarget ? '#f0abfc' : '#bbf7d0'}; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); text-align: center; max-width: 440px; }
+            h2 { color: ${connectedInstagram && isInstagramTarget ? '#86198f' : '#166534'}; margin: 0 0 8px; font-size: 20px; }
+            p { color: #374151; margin: 0 0 16px; font-size: 14px; }
             .sub { color: #6b7280; font-size: 12px; }
-            .badge { display: inline-block; background: #dcfce7; color: #166534; font-weight: bold; padding: 4px 12px; border-radius: 9999px; margin-bottom: 12px; font-size: 12px; }
+            .badge { display: inline-block; background: ${connectedInstagram && isInstagramTarget ? '#fae8ff' : '#dcfce7'}; color: ${connectedInstagram && isInstagramTarget ? '#86198f' : '#166534'}; font-weight: bold; padding: 4px 12px; border-radius: 9999px; margin-bottom: 12px; font-size: 12px; }
+            .warn { background: #fffbe6; border: 1px solid #fef08a; padding: 10px; border-radius: 10px; font-size: 12px; color: #854d0e; text-align: left; margin: 12px 0; }
           </style>
         </head>
         <body>
           <div class="card">
-            <div class="badge">✓ OAuth 2.0 Verified</div>
-            <h2>Facebook Page Connected!</h2>
-            <p>Page: <strong>${pageName}</strong></p>
-            ${connectedInstagram ? `<p style="font-size: 12px; color: #7e22ce;">Linked Instagram Account (<strong>@${igUsername}</strong>) was also connected automatically!</p>` : ''}
+            <div class="badge">✓ Meta OAuth 2.0 Verified</div>
+            <h2>${titleText}</h2>
+            <p>Facebook Page: <strong>${pageName}</strong></p>
+            ${
+              connectedInstagram
+                ? `<p style="font-size: 13px; color: #9333ea; font-weight: 600;">✓ Instagram Professional Account <strong>@${igUsername}</strong> connected!</p>`
+                : (isInstagramTarget
+                    ? `<div class="warn"><strong>Notice:</strong> Your Facebook Page is connected, but no Instagram Professional account is linked to it yet. In Facebook, go to <em>Page Settings → Linked Accounts → Instagram</em> to link it, then click Connect again.</div>`
+                    : '')
+            }
             <div class="sub">Closing window and updating dashboard...</div>
           </div>
           <script>
@@ -198,12 +234,14 @@ export async function GET(request: Request) {
                 type: 'META_AUTH_SUCCESS',
                 pageId: ${JSON.stringify(pageId)},
                 pageName: ${JSON.stringify(pageName)},
-                hasInstagram: ${connectedInstagram}
+                hasInstagram: ${connectedInstagram},
+                igUsername: ${JSON.stringify(igUsername)},
+                target: ${JSON.stringify(target || '')}
               }, '*');
             }
             setTimeout(() => {
               window.close();
-            }, 1200);
+            }, ${!connectedInstagram && isInstagramTarget ? 4000 : 1400});
           </script>
         </body>
       </html>`,

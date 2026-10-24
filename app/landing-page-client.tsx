@@ -197,16 +197,16 @@ export default function LandingPageClient({ session, dbConnected, dbError }: Lan
           <div className="flex items-center gap-md">
             {session ? (
               <div className="flex items-center gap-md">
-                <Link href="/dashboard" className="hidden sm:inline-flex items-center justify-center bg-primary hover:bg-[#003ea8] text-white px-md py-2 rounded-lg font-label-md transition-all">
+                <Link href="/dashboard" className="hidden sm:inline-flex items-center justify-center bg-[#1B4B91] hover:bg-[#163e78] text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs">
                   Go to Dashboard
                 </Link>
                 <button
                   onClick={() => signOut({ callbackUrl: '/' })}
-                  className="text-on-surface-variant hover:text-error transition-colors font-label-md"
+                  className="text-slate-600 hover:text-rose-600 transition-colors text-xs font-semibold"
                 >
                   Logout
                 </button>
-                <div className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/60">
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200">
                   <img 
                     className="w-full h-full object-cover" 
                     alt="Profile Avatar" 
@@ -215,12 +215,12 @@ export default function LandingPageClient({ session, dbConnected, dbError }: Lan
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-sm">
-                <Link href="/login" className="text-on-surface hover:text-primary px-4 py-2 font-label-md transition-colors">
+              <div className="flex items-center gap-2">
+                <Link href="/login" className="text-slate-700 hover:text-[#1B4B91] px-3.5 py-1.5 text-xs font-semibold transition-colors">
                   Login
                 </Link>
-                <Link href="/signup" className="bg-primary hover:bg-[#003ea8] text-white px-md py-2 rounded-lg font-label-md transition-all shadow-sm">
-                  Sign Up
+                <Link href="/signup" className="bg-[#1B4B91] hover:bg-[#163e78] text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs">
+                  Get Started Free
                 </Link>
               </div>
             )}

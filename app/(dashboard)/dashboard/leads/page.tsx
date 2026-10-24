@@ -207,32 +207,42 @@ export default function LeadsPage() {
     .reduce((sum, l) => sum + l.dealValue, 0) || 0;
 
   return (
-    <div className="h-[calc(100vh-140px)] flex flex-col font-sans text-[#1c1b1f] bg-slate-50/20 relative">
+    <div className="h-[calc(100vh-140px)] flex flex-col font-sans text-slate-900 bg-slate-50/50 relative">
       {/* Top Header Bar */}
-      <header className="h-16 flex items-center justify-between border-b border-[#c3c6d7] bg-white px-6 shrink-0">
+      <header className="h-16 flex items-center justify-between border-b border-slate-200/80 bg-white px-6 shrink-0 shadow-xs">
         <div className="flex items-center gap-6">
-          <h2 className="text-lg font-bold text-[#1c1b1f]">Lead Pipeline</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-bold text-slate-900">Lead Pipeline & CRM</h2>
+            <div className="hidden sm:flex items-center gap-2 text-xs">
+              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#1B4B91] border border-blue-200/60 font-semibold">
+                {activeLeadsCount} Active Leads
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-semibold">
+                ${totalPipelineValue.toLocaleString()} Pipeline
+              </span>
+            </div>
+          </div>
           
           {/* View Toggle */}
-          <div className="flex bg-slate-100 rounded-lg p-0.5 shrink-0">
+          <div className="flex bg-slate-100/90 rounded-xl p-0.5 shrink-0 border border-slate-200/60">
             <button
               onClick={() => setViewMode('kanban')}
               className={cn(
-                'px-4 py-1 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all',
-                viewMode === 'kanban' ? 'bg-white shadow-sm text-[#004ac6]' : 'text-[#737686] hover:text-[#1c1b1f]'
+                'px-3.5 py-1 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all',
+                viewMode === 'kanban' ? 'bg-white shadow-xs text-[#1B4B91]' : 'text-slate-500 hover:text-slate-900'
               )}
             >
-              <span className="material-symbols-outlined text-[16px]">view_kanban</span>
+              <span className="material-symbols-outlined text-[15px]">view_kanban</span>
               Kanban
             </button>
             <button
               onClick={() => setViewMode('list')}
               className={cn(
-                'px-4 py-1 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all',
-                viewMode === 'list' ? 'bg-white shadow-sm text-[#004ac6]' : 'text-[#737686] hover:text-[#1c1b1f]'
+                'px-3.5 py-1 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all',
+                viewMode === 'list' ? 'bg-white shadow-xs text-[#1B4B91]' : 'text-slate-500 hover:text-slate-900'
               )}
             >
-              <span className="material-symbols-outlined text-[16px]">list</span>
+              <span className="material-symbols-outlined text-[15px]">list</span>
               List
             </button>
           </div>
@@ -240,24 +250,24 @@ export default function LeadsPage() {
 
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="bg-[#004ac6] text-white hover:brightness-105 font-bold text-xs px-4 py-2 rounded-xl shadow-sm transition-all flex items-center gap-1 shrink-0"
+          className="bg-[#1B4B91] text-white hover:bg-[#163e78] font-bold text-xs px-4 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 shrink-0"
         >
           <span className="material-symbols-outlined text-[16px]">add</span>
-          Add Lead
+          <span>+ Add Lead</span>
         </button>
       </header>
 
       {/* Filter and Query Selection Bar */}
-      <div className="bg-white border-b border-[#c3c6d7] px-6 py-4 flex flex-wrap items-center gap-4 shrink-0">
+      <div className="bg-white border-b border-slate-200/80 px-6 py-3.5 flex flex-wrap items-center gap-4 shrink-0">
         {/* Agent Filter */}
         <div className="relative min-w-[150px]">
-          <label htmlFor="filter-agent" className="block text-[9px] uppercase tracking-wider text-[#737686] font-bold mb-1">Agent</label>
+          <label htmlFor="filter-agent" className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Assigned Agent</label>
           <select
             id="filter-agent"
             name="filterAgent"
             value={selectedAgent}
             onChange={(e) => setSelectedAgent(e.target.value)}
-            className="w-full bg-white border border-[#c3c6d7] rounded-lg px-3 py-1.5 text-xs outline-none focus:border-[#004ac6] focus:ring-4 focus:ring-[#004ac6]/10"
+            className="w-full bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-[#1B4B91] focus:bg-white transition"
           >
             <option value="ALL">All Agents</option>
             {agents?.map((a) => (
@@ -270,16 +280,18 @@ export default function LeadsPage() {
 
         {/* Source Filter */}
         <div className="relative min-w-[150px]">
-          <label htmlFor="filter-source" className="block text-[9px] uppercase tracking-wider text-[#737686] font-bold mb-1">Source</label>
+          <label htmlFor="filter-source" className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Lead Source</label>
           <select
             id="filter-source"
             name="filterSource"
             value={selectedSource}
             onChange={(e) => setSelectedSource(e.target.value)}
-            className="w-full bg-white border border-[#c3c6d7] rounded-lg px-3 py-1.5 text-xs outline-none focus:border-[#004ac6] focus:ring-4 focus:ring-[#004ac6]/10"
+            className="w-full bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-[#1B4B91] focus:bg-white transition"
           >
             <option value="ALL">All Sources</option>
             <option value="WhatsApp Broadcast">WhatsApp Broadcast</option>
+            <option value="Instagram DM">Instagram DM</option>
+            <option value="Facebook Messenger">Facebook Messenger</option>
             <option value="Organic Search">Organic Search</option>
             <option value="Paid Ads">Paid Ads</option>
             <option value="Referral">Referral</option>
@@ -288,13 +300,13 @@ export default function LeadsPage() {
 
         {/* Date Range Selection */}
         <div className="relative min-w-[150px]">
-          <label htmlFor="filter-daterange" className="block text-[9px] uppercase tracking-wider text-[#737686] font-bold mb-1">Date Range</label>
+          <label htmlFor="filter-daterange" className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Timeframe</label>
           <select
             id="filter-daterange"
             name="filterDateRange"
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value as 'ALL' | '7_DAYS' | 'THIS_MONTH' | 'LAST_MONTH')}
-            className="w-full bg-white border border-[#c3c6d7] rounded-lg px-3 py-1.5 text-xs outline-none focus:border-[#004ac6] focus:ring-4 focus:ring-[#004ac6]/10"
+            className="w-full bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-[#1B4B91] focus:bg-white transition"
           >
             <option value="ALL">All Time</option>
             <option value="7_DAYS">Last 7 Days</option>
@@ -304,10 +316,10 @@ export default function LeadsPage() {
         </div>
 
         {/* Search */}
-        <div className="ml-auto relative min-w-[220px]">
-          <label htmlFor="filter-search" className="block text-[9px] uppercase tracking-wider text-[#737686] font-bold mb-1">Search Pipeline</label>
+        <div className="ml-auto relative min-w-[240px]">
+          <label htmlFor="filter-search" className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Search Pipeline</label>
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[#737686] text-[18px]">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
               search
             </span>
             <input
@@ -316,8 +328,8 @@ export default function LeadsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Name, source, or value..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-[#c3c6d7] rounded-lg focus:outline-none focus:border-[#004ac6] focus:ring-4 focus:ring-[#004ac6]/10 text-xs"
+              placeholder="Filter by contact, company, phone..."
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#1B4B91] focus:bg-white text-xs font-medium text-slate-900 transition"
             />
           </div>
         </div>

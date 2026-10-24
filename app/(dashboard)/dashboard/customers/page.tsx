@@ -40,12 +40,17 @@ export default function CustomersIndexPage() {
   );
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#f9f9ff] overflow-y-auto">
-      {/* Header bar matching Stitch design */}
-      <header className="sticky top-0 z-20 bg-white border-b border-[#c3c6d7] h-16 flex items-center justify-between px-8 shrink-0 shadow-sm">
-        <h2 className="text-[18px] font-bold tracking-tight text-[#1c1b1f]">
-          Customers Directory
-        </h2>
+    <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-y-auto">
+      {/* Header bar */}
+      <header className="sticky top-0 z-20 bg-white border-b border-slate-200/80 h-16 flex items-center justify-between px-8 shrink-0 shadow-xs">
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-slate-900">
+            Customers & Contact Directory
+          </h2>
+          <p className="text-[11px] text-slate-500 font-medium">
+            Manage synchronized contact profiles, consent status, policy affiliations, and lifetime interactions.
+          </p>
+        </div>
         <div className="flex items-center gap-3">
           <div className="relative">
             <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">
@@ -56,10 +61,10 @@ export default function CustomersIndexPage() {
               name="customerSearch"
               aria-label="Search customers"
               type="text"
-              placeholder="Search customers..."
+              placeholder="Search by name, phone, or policy..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-slate-50 border border-[#c3c6d7] rounded-xl pl-9 pr-4 py-2 text-xs text-[#1c1b1f] focus:outline-none focus:border-[#004ac6] w-64 font-semibold"
+              className="bg-slate-50/60 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#1B4B91] focus:bg-white w-72 font-medium transition"
             />
           </div>
         </div>
@@ -67,16 +72,16 @@ export default function CustomersIndexPage() {
 
       {/* Main card list container */}
       <main className="flex-1 p-8 max-w-[1200px] w-full mx-auto space-y-6">
-        <div className="bg-white rounded-2xl border border-[#c3c6d7] overflow-hidden shadow-sm">
-          <div className="p-5 border-b border-[#c3c6d7] flex justify-between items-center bg-slate-50">
-            <h3 className="font-bold text-xs text-[#1c1b1f] uppercase tracking-wider">
+        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <h3 className="font-bold text-xs text-slate-800 uppercase tracking-wider">
               All Contacts ({filteredCustomers.length})
             </h3>
           </div>
           <div className="overflow-x-auto">
             {isLoading ? (
               <div className="p-8 text-center text-xs text-slate-500 animate-pulse">
-                Loading customers...
+                Loading contacts...
               </div>
             ) : filteredCustomers.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-500">
@@ -85,16 +90,16 @@ export default function CustomersIndexPage() {
             ) : (
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-50/50 border-b border-[#c3c6d7]">
-                    <th className="px-6 py-3.5 font-bold text-[#49454f] uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-3.5 font-bold text-[#49454f] uppercase tracking-wider">Phone / Identifier</th>
-                    <th className="px-6 py-3.5 font-bold text-[#49454f] uppercase tracking-wider">Location</th>
-                    <th className="px-6 py-3.5 font-bold text-[#49454f] uppercase tracking-wider">Tags</th>
-                    <th className="px-6 py-3.5 font-bold text-[#49454f] uppercase tracking-wider">Active Policy</th>
-                    <th className="px-6 py-3.5 font-bold text-[#49454f] uppercase tracking-wider text-right">Actions</th>
+                  <tr className="bg-slate-50/50 border-b border-slate-200/80">
+                    <th className="px-6 py-3.5 font-bold text-slate-600 uppercase tracking-wider">Contact</th>
+                    <th className="px-6 py-3.5 font-bold text-slate-600 uppercase tracking-wider">Phone / Identifier</th>
+                    <th className="px-6 py-3.5 font-bold text-slate-600 uppercase tracking-wider">Location</th>
+                    <th className="px-6 py-3.5 font-bold text-slate-600 uppercase tracking-wider">Tags</th>
+                    <th className="px-6 py-3.5 font-bold text-slate-600 uppercase tracking-wider">Active Policy</th>
+                    <th className="px-6 py-3.5 font-bold text-slate-600 uppercase tracking-wider text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#c3c6d7]/60">
+                <tbody className="divide-y divide-slate-100">
                   {filteredCustomers.map((customer) => {
                     const initials = customer.displayName
                       .split(' ')
@@ -104,16 +109,16 @@ export default function CustomersIndexPage() {
                       .toUpperCase();
 
                     return (
-                      <tr key={customer.id} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={customer.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-[#004ac6]/10 text-[#004ac6] flex items-center justify-center font-bold text-xs shrink-0">
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#1B4B91] border border-blue-200/60 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                               {initials}
                             </div>
                             <div>
                               <Link
                                 href={`/dashboard/customers/${customer.id}`}
-                                className="font-bold text-xs text-[#004ac6] hover:underline"
+                                className="font-bold text-xs text-[#1B4B91] hover:underline"
                               >
                                 {customer.displayName}
                               </Link>
@@ -123,14 +128,14 @@ export default function CustomersIndexPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 font-semibold text-[#1c1b1f]">
+                        <td className="px-6 py-4 font-semibold text-slate-800">
                           {customer.primaryPhone}
-                          <div className="text-[9px] text-[#737686] flex items-center gap-1 mt-0.5 font-bold">
-                            <span className={`w-1.5 h-1.5 rounded-full ${customer.optedIn ? 'bg-green-500' : 'bg-slate-400'}`} />
+                          <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
+                            <span className={`w-1.5 h-1.5 rounded-full ${customer.optedIn ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                             {customer.optedIn ? 'Opted In' : 'No Consent'}
                           </div>
                         </td>
-                        <td className="px-6 py-4 font-semibold text-[#49454f]">
+                        <td className="px-6 py-4 font-medium text-slate-600">
                           {customer.location || '—'}
                         </td>
                         <td className="px-6 py-4">
@@ -138,7 +143,7 @@ export default function CustomersIndexPage() {
                             {customer.tags.map((tag) => (
                               <span
                                 key={tag}
-                                className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-full text-[9px] font-bold text-[#49454f]"
+                                className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-semibold border border-slate-200/60"
                               >
                                 {tag}
                               </span>

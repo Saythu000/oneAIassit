@@ -22,6 +22,8 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  Zap,
   X,
   LucideIcon,
 } from 'lucide-react';
@@ -31,6 +33,8 @@ interface NavItem {
   href: string;
   roles?: string[];
   icon: LucideIcon;
+  badge?: string;
+  badgeColor?: string;
 }
 
 interface NavSection {
@@ -44,6 +48,7 @@ export default function DashboardSidebar() {
   const { isMobileOpen, setIsMobileOpen, isCollapsed, toggleCollapsed } = useSidebar();
 
   const userRole = info?.role || '';
+  const tenantName = info?.tenantName || 'OneAIAssist';
 
   // Close mobile drawer automatically when route changes
   useEffect(() => {
@@ -52,7 +57,7 @@ export default function DashboardSidebar() {
 
   const sections: NavSection[] = [
     {
-      title: 'MAIN',
+      title: 'CORE WORKSPACE',
       items: [
         {
           name: 'Dashboard',
@@ -60,59 +65,58 @@ export default function DashboardSidebar() {
           icon: LayoutDashboard,
         },
         {
-          name: 'Inbox',
+          name: 'Unified Inbox',
           href: '/dashboard/inbox',
           roles: ['PLATFORM_OWNER', 'ADMIN', 'MANAGER', 'AGENT'],
           icon: Inbox,
+          badge: 'Live',
+          badgeColor: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20',
         },
         {
-          name: 'Leads',
+          name: 'Leads & Pipeline',
           href: '/dashboard/leads',
           roles: ['PLATFORM_OWNER', 'ADMIN', 'MANAGER', 'AGENT'],
           icon: Users,
         },
         {
-          name: 'Customers',
+          name: 'Customer CRM',
           href: '/dashboard/customers',
           roles: ['PLATFORM_OWNER', 'ADMIN', 'MANAGER', 'AGENT'],
           icon: UserCheck,
         },
+      ],
+    },
+    {
+      title: 'MARKETING & AUTOMATION',
+      items: [
         {
-          name: 'Campaigns',
+          name: 'Broadcast Campaigns',
           href: '/dashboard/campaigns',
           roles: ['PLATFORM_OWNER', 'ADMIN', 'MANAGER', 'AGENT'],
           icon: Megaphone,
         },
         {
-          name: 'Sequences',
+          name: 'Drip Sequences',
           href: '/dashboard/sequences',
           roles: ['PLATFORM_OWNER', 'ADMIN', 'MANAGER'],
           icon: CalendarClock,
         },
         {
-          name: 'Marketing',
+          name: 'Content & Social Hub',
           href: '/dashboard/marketing',
           roles: ['PLATFORM_OWNER', 'ADMIN', 'MANAGER'],
           icon: LineChart,
+          badge: 'New',
+          badgeColor: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30',
         },
         {
-          name: 'Analytics',
-          href: '/dashboard/analytics',
-          icon: BarChart3,
-        },
-      ],
-    },
-    {
-      title: 'AI & CONTENT',
-      items: [
-        {
-          name: 'AI & Bot',
+          name: 'AI Agent & Bot',
           href: '/dashboard/ai-bot',
           roles: ['PLATFORM_OWNER', 'ADMIN', 'MANAGER', 'AGENT'],
           icon: Bot,
         },
         {
-          name: 'Templates',
+          name: 'Message Templates',
           href: '/dashboard/templates',
           roles: ['PLATFORM_OWNER', 'ADMIN', 'MANAGER', 'AGENT'],
           icon: FileText,
@@ -120,16 +124,21 @@ export default function DashboardSidebar() {
       ],
     },
     {
-      title: 'SYSTEM',
+      title: 'ADMIN & SYSTEM',
       items: [
         {
-          name: 'Settings',
+          name: 'Analytics & ROI',
+          href: '/dashboard/analytics',
+          icon: BarChart3,
+        },
+        {
+          name: 'Channels & Settings',
           href: '/dashboard/settings',
           roles: ['PLATFORM_OWNER', 'ADMIN'],
           icon: Settings,
         },
         {
-          name: 'Superadmin',
+          name: 'Superadmin Console',
           href: '/superadmin',
           roles: ['PLATFORM_OWNER'],
           icon: ShieldCheck,
@@ -140,29 +149,34 @@ export default function DashboardSidebar() {
 
   const renderNavContent = (collapsed: boolean) => (
     <>
-      {/* Brand Header */}
+      {/* Workspace Switcher / Brand Header */}
       <div className={cn(
-        "py-4 border-b border-white/10 flex items-center shrink-0 transition-all",
-        collapsed ? "px-3 justify-center" : "px-6 justify-between"
+        "py-4 border-b border-slate-800/80 flex items-center shrink-0 transition-all",
+        collapsed ? "px-3 justify-center" : "px-4 justify-between"
       )}>
-        <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/OneAILogo.png"
-            alt="OneAIAssist Logo"
-            className="h-8 w-8 shrink-0 object-contain"
-          />
+        <Link href="/dashboard" className="flex items-center gap-3 min-w-0 group">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 shrink-0 group-hover:scale-105 transition-transform duration-200">
+            <Zap className="w-5 h-5 fill-white text-white" />
+          </div>
           {!collapsed && (
-            <span className="font-bold tracking-tight text-white text-lg truncate">
-              OneAIAssist
-            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold tracking-tight text-white text-sm truncate">
+                  {tenantName}
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
+                  Pro
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 truncate">AI Multi-Channel Suite</p>
+            </div>
           )}
         </Link>
         {!collapsed && (
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
             title="Collapse sidebar"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -171,7 +185,7 @@ export default function DashboardSidebar() {
       </div>
 
       {/* Nav List */}
-      <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <LayoutGroup id={collapsed ? "sidebar-collapsed" : "sidebar-expanded"}>
           {sections.map((section) => {
             const filteredItems = section.items.filter(
@@ -181,9 +195,9 @@ export default function DashboardSidebar() {
             if (filteredItems.length === 0) return null;
 
             return (
-              <div key={section.title} className="space-y-1">
+              <div key={section.title} className="space-y-1.5">
                 {!collapsed && (
-                  <h5 className="px-3 text-[10px] font-bold text-[#E2E8F0]/40 uppercase tracking-widest text-left truncate">
+                  <h5 className="px-3 text-[10px] font-extrabold text-slate-400/80 uppercase tracking-widest text-left truncate">
                     {section.title}
                   </h5>
                 )}
@@ -201,26 +215,40 @@ export default function DashboardSidebar() {
                         href={item.href}
                         title={collapsed ? item.name : undefined}
                         className={cn(
-                          'relative flex items-center rounded-lg text-sm font-medium transition-colors duration-150',
+                          'relative flex items-center rounded-xl text-xs font-medium transition-all duration-150 group',
                           collapsed
-                            ? 'justify-center p-2.5'
-                            : 'gap-3 px-3.5 py-2.5',
+                            ? 'justify-center p-2.5 my-0.5'
+                            : 'gap-3 px-3 py-2.5 my-0.5',
                           isActive
-                            ? 'text-white font-semibold shadow-sm'
-                            : 'text-[#E2E8F0] hover:text-white hover:bg-white/[0.08]'
+                            ? 'text-white font-semibold'
+                            : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
                         )}
                       >
                         {isActive && (
                           <motion.div
                             layoutId="activeSidebarTab"
-                            className="absolute inset-0 bg-[#2563EB] rounded-lg -z-0"
-                            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                            className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-xl shadow-md shadow-indigo-600/30 -z-0"
+                            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                           />
                         )}
-                        <IconComponent className={cn("shrink-0 z-10", collapsed ? "w-5 h-5" : "w-5 h-5")} />
+                        <IconComponent
+                          className={cn(
+                            "shrink-0 z-10 transition-colors duration-200",
+                            collapsed ? "w-5 h-5" : "w-4 h-4",
+                            isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"
+                          )}
+                        />
                         {!collapsed && (
-                          <span className="z-10 truncate text-xs font-medium">
+                          <span className="z-10 truncate text-xs flex-1">
                             {item.name}
+                          </span>
+                        )}
+                        {!collapsed && item.badge && (
+                          <span className={cn(
+                            "z-10 text-[10px] font-bold px-1.5 py-0.2 rounded-full leading-tight shrink-0",
+                            item.badgeColor || "bg-indigo-500/20 text-indigo-300"
+                          )}>
+                            {item.badge}
                           </span>
                         )}
                       </Link>
@@ -235,14 +263,14 @@ export default function DashboardSidebar() {
 
       {/* Footer / System Status */}
       <div className={cn(
-        "p-3.5 border-t border-white/10 text-xs text-[#E2E8F0]/70 flex items-center shrink-0",
+        "p-3.5 border-t border-slate-800/80 bg-slate-950/40 text-xs text-slate-400 flex items-center shrink-0",
         collapsed ? "justify-center" : "justify-between"
       )}>
         {collapsed ? (
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
             title="Expand sidebar"
           >
             <ChevronRight className="w-4 h-4" />
@@ -250,10 +278,15 @@ export default function DashboardSidebar() {
         ) : (
           <>
             <div className="flex items-center gap-2 truncate">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="font-medium text-white/90 text-[11px] truncate">System Online</span>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="font-semibold text-slate-300 text-[11px] truncate">AI & Engine Live</span>
             </div>
-            <span className="text-[10px] uppercase font-bold text-white/50 tracking-wider">v1.0</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-400 border border-slate-700/50">
+              v2.5
+            </span>
           </>
         )}
       </div>
@@ -265,7 +298,7 @@ export default function DashboardSidebar() {
       {/* Mobile Drawer Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300",
+          "fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300",
           isMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
         onClick={() => setIsMobileOpen(false)}
@@ -275,20 +308,21 @@ export default function DashboardSidebar() {
       {/* Mobile Slide-Over Drawer */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col bg-[#1B4B91] border-r border-white/10 text-white w-72 lg:hidden transition-transform duration-300 ease-in-out shadow-2xl h-full",
+          "fixed inset-y-0 left-0 z-50 flex flex-col bg-[#0B0F19] border-r border-slate-800/80 text-white w-72 lg:hidden transition-transform duration-300 ease-in-out shadow-2xl h-full",
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80 shrink-0">
           <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/OneAILogo.png" alt="Logo" className="h-8 w-8 object-contain" />
-            <span className="font-bold text-white text-lg">OneAIAssist</span>
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
+              <Zap className="w-4 h-4 fill-white" />
+            </div>
+            <span className="font-bold text-white text-base">OneAIAssist</span>
           </div>
           <button
             type="button"
             onClick={() => setIsMobileOpen(false)}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white"
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
             aria-label="Close sidebar"
           >
             <X className="w-5 h-5" />
@@ -302,7 +336,7 @@ export default function DashboardSidebar() {
       {/* Desktop Fixed Sidebar */}
       <aside
         className={cn(
-          "hidden lg:flex flex-col h-screen shrink-0 bg-[#1B4B91] border-r border-white/10 text-white transition-[width] duration-200 ease-in-out z-20 sticky top-0",
+          "hidden lg:flex flex-col h-screen shrink-0 bg-[#0B0F19] border-r border-slate-800/80 text-white transition-[width] duration-200 ease-in-out z-20 sticky top-0 shadow-sm",
           isCollapsed ? "w-20" : "w-64"
         )}
       >

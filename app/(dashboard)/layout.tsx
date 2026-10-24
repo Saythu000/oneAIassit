@@ -10,7 +10,7 @@ export default function DashboardLayout({
 }) {
   return (
     <SidebarProvider>
-      <div className="h-screen w-screen overflow-hidden flex bg-[#f9f9ff] text-[#1c1b1f]">
+      <div className="h-screen w-screen overflow-hidden flex bg-[#F8FAFC] text-slate-900">
         {/* Dynamic Role-Gated Sidebar (Desktop Fixed + Mobile Drawer) */}
         <DashboardSidebar />
 
